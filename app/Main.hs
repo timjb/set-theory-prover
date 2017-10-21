@@ -1,6 +1,6 @@
 module Main where
 
-import Core
+import Axioms
 
 main :: IO ()
 main = return ()

@@ -1,17 +1,33 @@
-module Core
-  ( VarName
-  , Term (..)
-  , Formula (..)
-  , iff, existsUnique
-  , Proof(getFormula)
+module Axioms
+  (
+  -- * Proof data type
+    Proof(getFormula)
+  -- * Modus Ponens
   , mp
-  , ax2, ax3, ax4, ax5, ax6, ax7, ax8, ax9
-  , and_intro, and_elim1, and_elim2
-  , or_intro1, or_intro2, or_elim
+  -- * Axioms for first-order logic
+  -- ** Axioms for ⇒
+  , ax2
+  , ax3
+  -- ** Axiom for ¬
+  , ax4
+  -- ** Axioms for ∀
+  , ax5
+  , ax6
+  , ax7
+  -- ** Axioms for =
+  , ax8
+  , ax9
+  -- ** Axioms for ∧
+  , and_intro
+  , and_elim1
+  , and_elim2
+  -- ** Axioms for ∨
+  , or_intro1
+  , or_intro2
+  , or_elim
+  -- ** Axioms for ∃ and ∀
   , exists_elim
-  , subset, forallIn, existsIn
-  , emptySet, setComprehension, intersection, union
-  , pairSet, singletonSet
+  -- * ZFC axioms
   , extensionalityAxiom
   , regularityAxiom
   , separationAxiom
@@ -23,78 +39,7 @@ module Core
   , choiceAxiom
   ) where
 
-type VarName = String
-
-varUnion :: [VarName] -> [VarName] -> [VarName]
-varUnion xs ys = xs ++ filter (`notElem` xs) ys
-
--- TODO: function application?
-data Term
-  = Var VarName
-  | DefDescr VarName Formula -- ^ definite descriptor
-  deriving (Eq)
-
-fvInTerm :: Term -> [VarName]
-fvInTerm (Var x) = [x]
-fvInTerm (DefDescr x f) = filter (/= x) (fvInFormula f)
-
-replaceInTerm :: VarName -> Term -> Term -> Term
-replaceInTerm x s t =
-  case t of
-    Var y -> if x == y then s else t
-    DefDescr y f -> if x == y then t else DefDescr y (replaceInFormula x s f)
-
-data Formula
-  -- First-order logic (with equality)
-  = Implies Formula Formula
-  | And Formula Formula
-  | Or Formula Formula
-  | Neg Formula
-  | Eq Term Term
-  | Forall VarName Formula
-  | Exists VarName Formula
-  -- Set-theory
-  | Elem Term Term
-  deriving (Eq)
-
-iff :: Formula -> Formula -> Formula
-iff phi psi = (phi `Implies` psi) `And` (psi `Implies` phi)
-
-existsUnique :: VarName -> Formula -> Formula
-existsUnique x phi = Exists x (And phi uniquenessOfX)
-  where
-    y = freshVar (fvInFormula phi)
-    uniquenessOfX = Forall y (Implies (replaceInFormula x (Var y) phi) (Eq (Var x) (Var y)))
-
--- | Introduce all-quantifiers for all free variables
-generalize :: Formula -> Formula
-generalize phi =
-  let vs = fvInFormula phi
-  in foldl (\psi v -> Forall v psi) phi vs
-
-fvInFormula :: Formula -> [VarName]
-fvInFormula f =
-  case f of
-    Implies g h -> fvInFormula g `varUnion` fvInFormula h
-    And g h     -> fvInFormula g `varUnion` fvInFormula h
-    Or g h      -> fvInFormula g `varUnion` fvInFormula h
-    Neg g       -> fvInFormula g
-    Eq s t      -> fvInTerm s `varUnion` fvInTerm t
-    Forall x g  -> filter (/= x) (fvInFormula g)
-    Exists x g  -> filter (/= x) (fvInFormula g)
-    Elem s t    -> fvInTerm s `varUnion` fvInTerm t
-
-replaceInFormula :: VarName -> Term -> Formula -> Formula
-replaceInFormula x s f =
-  case f of
-    Implies g h -> Implies (replaceInFormula x s g) (replaceInFormula x s h)
-    And g h -> And (replaceInFormula x s g) (replaceInFormula x s h)
-    Or g h -> Or (replaceInFormula x s g) (replaceInFormula x s h)
-    Neg g -> Neg (replaceInFormula x s g)
-    Eq r t -> Eq (replaceInTerm x s r) (replaceInTerm x s t)
-    Forall y g -> if x == y then f else Forall y (replaceInFormula x s g)
-    Exists y g -> if x == y then f else Exists y (replaceInFormula x s g)
-    Elem r t -> Elem (replaceInTerm x s r) (replaceInTerm x s t)
+import Syntax
 
 newtype Proof = Proof { getFormula :: Formula }
 
@@ -191,67 +136,6 @@ exists_elim x phi psi =
   where
     precedent = Forall x (Implies phi psi)
     consequent = Implies (Exists x phi) psi
-
--- TODO: move into other module?
-varSource :: [VarName]
-varSource = ["x" ++ show n | n <- [(1 :: Int)..] ]
-
-freshVars :: [VarName] -> [VarName]
-freshVars vs = filter (`notElem` vs) varSource
-
-freshVar :: [VarName] -> VarName
-freshVar = head . freshVars
-
--- TODO: move into other module?
-subset :: Term -> Term -> Formula
-subset s t =
-  let x = freshVar (fvInTerm s `varUnion` fvInTerm t)
-  in Forall x ((Var x `Elem` s) `Implies` (Var x `Elem` t))
-
--- TODO: make pattern?
-forallIn :: VarName -> Term -> Formula -> Formula
-forallIn x y phi = Forall x ((Var x `Elem` y) `Implies` phi)
-
--- TODO: make pattern?
-existsIn :: VarName -> Term -> Formula -> Formula
-existsIn x y phi = Exists x ((Var x `Elem` y) `And` phi)
-
-existsUniqueIn :: VarName -> Term -> Formula -> Formula
-existsUniqueIn x y phi = existsUnique x ((Var x `Elem` y) `And` phi)
-
-emptySet :: Term
-emptySet = DefDescr name (Forall x (Neg (Var x `Elem` Var name)))
-  where
-    name = "∅"
-    x = "x"
-
-pairSet :: Term -> Term -> Term
-pairSet s t =
-  let x:y:_ = freshVars (fvInTerm s `varUnion` fvInTerm t)
-  in DefDescr x (Forall y ((Var y `Elem` Var x) `iff` ((Var y `Eq` s) `Or` (Var y `Eq` t))))
-
-singletonSet :: Term -> Term
-singletonSet t =
-  let x:y:_ = freshVars (fvInTerm t)
-  in DefDescr x (Forall y ((Var y `Elem` Var x) `iff` (Var y `Eq` t)))
-
--- | '{ x ∈ y | phi }'
-setComprehension :: VarName -> Term -> Formula -> Term
-setComprehension x y phi = DefDescr u (Forall x (Elem (Var x) (Var u) `iff` (Elem (Var x) y `And` phi)))
-  where
-    u = freshVar ([x] `varUnion` (fvInTerm y `varUnion` fvInFormula phi))
-
-logicalToSetOperator :: (Formula -> Formula -> Formula) -> Term -> Term -> Term
-logicalToSetOperator op x y =
-  DefDescr u (Forall v ((Var v `Elem` Var u) `iff` ((Var v `Elem` x) `op` (Var v `Elem` y))))
-  where
-    u:v:_ = freshVars (fvInTerm x `varUnion` fvInTerm y)
-
-intersection :: Term -> Term -> Term
-intersection = logicalToSetOperator And
-
-union :: Term -> Term -> Term
-union = logicalToSetOperator Or
 
 -- ZFC axioms
 -- (source: https://en.wikipedia.org/wiki/Zermelo%E2%80%93Fraenkel_set_theory)
