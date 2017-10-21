@@ -2,10 +2,12 @@ module Axioms
   (
   -- * Proof data type
     Proof(getFormula)
-  -- * Modus Ponens
+  -- * Proof Rules
   , mp
-  -- * Axioms for first-order logic
+  , generalise
+  -- * Axioms for a Hilbert-style deductive system
   -- ** Axioms for ⇒
+  , ax1
   , ax2
   , ax3
   -- ** Axiom for ¬
@@ -53,34 +55,52 @@ mp (Proof p) (Proof q) =
         else error "mp: The second argument of 'mp' must be equal to the precedent of the first argument!"
     _ -> error "mp: The first argument to 'mp' must be the proof of an implication!"
 
+-- | Generalisation
+generalise :: VarName -> Proof -> Proof
+generalise x (Proof phi) = Proof (Forall x phi)
+
+-- | Axiom schema 'φ ⇒ φ'
+--
+-- This is implemented using 'ax2' and 'ax3', showing that this axiom is not strictly necessary.
+ax1 :: Formula -> Proof
+ax1 phi =
+  let
+    step1 = ax2 phi (phi `Implies` phi)     -- φ ⇒ (φ ⇒ φ) ⇒ φ
+    step2 = ax3 phi (phi `Implies` phi) phi -- (φ ⇒ (φ ⇒ φ) ⇒ φ) ⇒ (φ ⇒ φ ⇒ φ) ⇒ φ
+    step3 = mp step2 step1                  -- (φ ⇒ φ ⇒ φ) ⇒ φ
+    step4 = ax2 phi phi                     -- φ ⇒ φ ⇒ φ
+    step5 = mp step3 step4                  -- φ
+  in
+    step5
+
 -- | Axiom schema 'φ ⇒ ψ ⇒ φ'
 ax2 :: Formula -> Formula -> Proof
-ax2 phi psi = Proof (generalize (Implies phi (Implies psi phi)))
+ax2 phi psi = Proof (phi `Implies` (psi `Implies` phi))
 
 -- | Axiom schema '(φ ⇒ ψ ⇒ ξ) ⇒ (φ ⇒ ψ) ⇒ (φ ⇒ ξ)'
 ax3 :: Formula -> Formula -> Formula -> Proof
-ax3 phi psi xi = Proof (generalize (Implies antecedent consequent))
+ax3 phi psi xi = Proof (antecedent `Implies` consequent)
   where
     antecedent = Implies phi (Implies psi xi)
     consequent = Implies (Implies phi psi) (Implies phi xi)
 
 -- | Axiom schema '(¬φ ⇒ ¬ψ) ⇒ ψ ⇒ φ
 ax4 :: Formula -> Formula -> Proof
-ax4 phi psi = Proof (generalize (Implies antecedent consequent))
+ax4 phi psi = Proof (antecedent `Implies` consequent)
   where
     antecedent = Implies (Neg phi) (Neg psi)
     consequent = Implies psi phi
 
 -- | Axiom schema '(∀x. φ) ⇒ φ[x := t]'
 ax5 :: VarName -> Term -> Formula -> Proof
-ax5 x s phi = Proof (generalize (Implies antecedent consequent))
+ax5 x s phi = Proof (antecedent `Implies` consequent)
   where
     antecedent = Forall x phi
     consequent = replaceInFormula x s phi
 
 -- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∀x. φ) ⇒ (∀x. ψ)'
 ax6 :: VarName -> Formula -> Formula -> Proof
-ax6 x phi psi = Proof (generalize (Implies antecedent consequent))
+ax6 x phi psi = Proof (antecedent `Implies` consequent)
   where
     antecedent = Forall x (Implies phi psi)
     consequent = Implies (Forall x phi) (Forall x psi)
@@ -94,11 +114,11 @@ ax7 phi x =
 
 -- | Axiom schema 't = t' (reflexivity)
 ax8 :: Term -> Proof
-ax8 t = Proof (generalize (Eq t t))
+ax8 t = Proof (Eq t t)
 
 -- | Axiom schema 's = t ⇒ φ[x := s] ⇒ φ[x := t]' (transport)
 ax9 :: Term -> Term -> VarName -> Formula -> Proof
-ax9 s t x phi = Proof (generalize (Implies antecedent consequent))
+ax9 s t x phi = Proof (antecedent `Implies` consequent)
   where
     antecedent = Eq s t
     consequent = Implies (replaceInFormula x s phi) (replaceInFormula x t phi)
@@ -109,30 +129,30 @@ and_intro phi psi = Proof (Implies phi (Implies psi (And phi psi)))
 
 -- | Axiom schema 'φ ∧ ψ ⇒ φ'
 and_elim1 :: Formula -> Formula -> Proof
-and_elim1 phi psi = Proof (generalize (Implies (And phi psi) phi))
+and_elim1 phi psi = Proof (Implies (And phi psi) phi)
 
 -- | Axiom schema 'φ ∧ ψ ⇒ ψ'
 and_elim2 :: Formula -> Formula -> Proof
-and_elim2 phi psi = Proof (generalize (Implies (And phi psi) psi))
+and_elim2 phi psi = Proof (Implies (And phi psi) psi)
 
 -- | Axiom schema '(φ ⇒ ξ) ⇒ (ψ ⇒ ξ) ⇒ (φ ∨ ψ ⇒ ξ)'
 or_elim :: Formula -> Formula -> Formula -> Proof
-or_elim phi psi xi = Proof (generalize (Implies (Implies phi xi) (Implies (Implies psi xi) (Implies (Or phi psi) xi))))
+or_elim phi psi xi = Proof (Implies (Implies phi xi) (Implies (Implies psi xi) (Implies (Or phi psi) xi)))
 
 -- | Axiom schema 'φ ⇒ φ ∨ ψ'
 or_intro1 :: Formula -> Formula -> Proof
-or_intro1 phi psi = Proof (generalize (Implies phi (Or phi psi)))
+or_intro1 phi psi = Proof (Implies phi (Or phi psi))
 
 -- | Axiom schema 'ψ ⇒ φ ∨ ψ'
 or_intro2 :: Formula -> Formula -> Proof
-or_intro2 phi psi = Proof (generalize (Implies psi (Or phi psi)))
+or_intro2 phi psi = Proof (Implies psi (Or phi psi))
 
 -- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∃x. φ) ⇒ ψ'
 exists_elim :: VarName -> Formula -> Formula -> Proof
 exists_elim x phi psi =
   if x `elem` fvInFormula psi
     then error "exists_elim: variable must not occur freely in second formula"
-    else Proof (generalize (Implies precedent consequent))
+    else Proof (Implies precedent consequent)
   where
     precedent = Forall x (Implies phi psi)
     consequent = Implies (Exists x phi) psi
@@ -141,7 +161,7 @@ exists_elim x phi psi =
 -- (source: https://en.wikipedia.org/wiki/Zermelo%E2%80%93Fraenkel_set_theory)
 
 extensionalityAxiom :: Proof
-extensionalityAxiom = Proof (Forall x (Forall y (Implies antecedent consequent)))
+extensionalityAxiom = Proof (Forall x (Forall y (antecedent `Implies` consequent)))
   where
     antecedent = And (subset (Var x) (Var y)) (subset (Var y) (Var x))
     consequent = Eq (Var x) (Var y)
@@ -149,7 +169,7 @@ extensionalityAxiom = Proof (Forall x (Forall y (Implies antecedent consequent))
     y = "y"
 
 regularityAxiom :: Proof
-regularityAxiom = Proof (Forall x (Implies antecedent consequent))
+regularityAxiom = Proof (Forall x (antecedent `Implies` consequent))
   where
     antecedent = Exists y (Elem (Var y) (Var x))
     consequent = existsIn y (Var x) (Neg (existsIn z (Var y) (Elem (Var z) (Var x))))
@@ -161,7 +181,7 @@ regularityAxiom = Proof (Forall x (Implies antecedent consequent))
 separationAxiom :: VarName -> VarName -> Formula -> Proof
 separationAxiom x z phi =
   let y = freshVar (fvInFormula phi `varUnion` [x,z])
-  in Proof (generalize (Forall z (Exists y (Forall x ((Var x `Elem` Var y) `iff` ((Var x `Elem` Var z) `And` phi))))))
+  in Proof (Forall z (Exists y (Forall x ((Var x `Elem` Var y) `iff` ((Var x `Elem` Var z) `And` phi)))))
 
 pairingAxiom :: Proof
 pairingAxiom = Proof (Forall x (Forall y (Exists z ((Var x `Elem` Var z) `And` (Var y `Elem` Var z)))))
@@ -184,7 +204,7 @@ replacementAxiom x y a phi =
   let b = freshVar (fvInFormula phi)
       antecedent = forallIn x (Var a) (existsUnique y phi)
       consequent = Exists b (forallIn x (Var a) (existsIn y (Var b) phi))
-  in Proof (generalize (antecedent `Implies` consequent))
+  in Proof (antecedent `Implies` consequent)
 
 successor :: Term -> Term
 successor x = pairSet x (singletonSet x)

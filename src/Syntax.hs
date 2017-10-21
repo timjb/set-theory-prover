@@ -12,10 +12,11 @@ module Syntax
   -- ** In formulas
   , fvInFormula
   , replaceInFormula
-  , generalize
   -- * Derived logical connectives
   , iff
   -- * Derived predicates
+  , truth
+  , falsity
   , subset
   , superset
   -- * Derived quantifiers
@@ -42,7 +43,7 @@ varUnion xs ys = xs ++ filter (`notElem` xs) ys
 data Term
   = Var VarName
   | DefDescr VarName Formula -- ^ definite descriptor
-  deriving (Eq)
+  deriving (Eq, Show)
 
 fvInTerm :: Term -> [VarName]
 fvInTerm (Var x) = [x]
@@ -56,16 +57,16 @@ replaceInTerm x s t =
 
 data Formula
   -- First-order logic (with equality)
-  = Implies Formula Formula
-  | And Formula Formula
-  | Or Formula Formula
-  | Neg Formula
-  | Eq Term Term
-  | Forall VarName Formula
-  | Exists VarName Formula
+  = Implies Formula Formula -- ^ implication
+  | And Formula Formula -- ^ conjunction
+  | Or Formula Formula -- ^ disjunction
+  | Neg Formula -- ^ negation
+  | Eq Term Term -- ^ equality
+  | Forall VarName Formula -- ^ universal quantification
+  | Exists VarName Formula -- ^ existential quantification
   -- Set-theory
-  | Elem Term Term
-  deriving (Eq)
+  | Elem Term Term -- ^ Element relation
+  deriving (Eq, Show)
 
 iff :: Formula -> Formula -> Formula
 iff phi psi = (phi `Implies` psi) `And` (psi `Implies` phi)
@@ -75,12 +76,6 @@ existsUnique x phi = Exists x (And phi uniquenessOfX)
   where
     y = freshVar (fvInFormula phi)
     uniquenessOfX = Forall y (Implies (replaceInFormula x (Var y) phi) (Eq (Var x) (Var y)))
-
--- | Introduce all-quantifiers for all free variables
-generalize :: Formula -> Formula
-generalize phi =
-  let vs = fvInFormula phi
-  in foldl (\psi v -> Forall v psi) phi vs
 
 fvInFormula :: Formula -> [VarName]
 fvInFormula f =
@@ -115,6 +110,14 @@ freshVars vs = filter (`notElem` vs) varSource
 
 freshVar :: [VarName] -> VarName
 freshVar = head . freshVars
+
+truth :: Formula
+truth = Forall x (Var x `Eq` Var x)
+  where
+    x = "x"
+
+falsity :: Formula
+falsity = Neg truth
 
 subset :: Term -> Term -> Formula
 subset s t =
