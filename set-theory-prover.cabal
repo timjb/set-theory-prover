@@ -19,6 +19,8 @@ library
   exposed-modules:
     Syntax
     Axioms
+    ProofState
+    Tactics
   build-depends:       base >= 4.7 && < 5
   default-language:    Haskell2010
 

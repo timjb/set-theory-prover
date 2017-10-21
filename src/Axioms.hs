@@ -98,6 +98,7 @@ ax5 x s phi = Proof (antecedent `Implies` consequent)
     antecedent = Forall x phi
     consequent = replaceInFormula x s phi
 
+-- TODO: According to wikipedia this isn't strictly needed. Is this right? In that case, derive it.
 -- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∀x. φ) ⇒ (∀x. ψ)'
 ax6 :: VarName -> Formula -> Formula -> Proof
 ax6 x phi psi = Proof (antecedent `Implies` consequent)
@@ -105,6 +106,7 @@ ax6 x phi psi = Proof (antecedent `Implies` consequent)
     antecedent = Forall x (Implies phi psi)
     consequent = Implies (Forall x phi) (Forall x psi)
 
+-- TODO: According to wikipedia this isn't strictly needed. Is this right? In that case, derive it.
 -- | Axiom schema 'φ ⇒ (∀x. φ)' if x is not free in φ
 ax7 :: Formula -> VarName -> Proof
 ax7 phi x =
