@@ -66,10 +66,10 @@ ax1 :: Formula -> Proof
 ax1 phi =
   let
     step1 = ax2 phi (phi `Implies` phi)     -- φ ⇒ (φ ⇒ φ) ⇒ φ
-    step2 = ax3 phi (phi `Implies` phi) phi -- (φ ⇒ (φ ⇒ φ) ⇒ φ) ⇒ (φ ⇒ φ ⇒ φ) ⇒ φ
-    step3 = mp step2 step1                  -- (φ ⇒ φ ⇒ φ) ⇒ φ
+    step2 = ax3 phi (phi `Implies` phi) phi -- (φ ⇒ (φ ⇒ φ) ⇒ φ) ⇒ (φ ⇒ φ ⇒ φ) ⇒ (φ ⇒ φ)
+    step3 = mp step2 step1                  -- (φ ⇒ φ ⇒ φ) ⇒ (φ ⇒ φ)
     step4 = ax2 phi phi                     -- φ ⇒ φ ⇒ φ
-    step5 = mp step3 step4                  -- φ
+    step5 = mp step3 step4                  -- φ ⇒ φ
   in
     step5
 

@@ -19,6 +19,8 @@ library
   exposed-modules:
     Syntax
     Axioms
+    LambdaEmbedding
+    Consequences
     ProofState
     Tactics
   build-depends:       base >= 4.7 && < 5
