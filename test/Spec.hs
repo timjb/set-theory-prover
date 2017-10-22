@@ -3,6 +3,8 @@ module Main where
 import Syntax
 import Axioms
 import Consequences
+import ProofState
+import Tactics
 
 import Control.Monad (unless)
 import System.Exit (exitFailure)
@@ -24,11 +26,21 @@ phi = Var "x" `Elem` Var "s"
 psi = Var "y" `Elem` Var "s"
 xi  = Var "z" `Elem` Var "s"
 
+tacticProof :: Proof
+tacticProof =
+  prove (psi `Implies` (phi `Implies` (psi `Or` phi)))
+  [ intro "h1"
+  , intro "h2"
+  , left
+  , assumption "h1"
+  ]
+
 main :: IO ()
 main = do
   results <- sequence
     [ checkProof (ax1 phi) (phi `Implies` phi)
     , checkProof (ignoreFirstArg psi phi) (phi `Implies` (psi `Implies` psi))
     , checkProof (compose phi psi xi) ((psi `Implies` xi) `Implies` ((phi `Implies` psi) `Implies` (phi `Implies` xi)))
+    , checkProof tacticProof (psi `Implies` (phi `Implies` (psi `Or` phi)))
     ]
   unless (all id results) exitFailure

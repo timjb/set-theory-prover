@@ -1,5 +1,6 @@
 module ProofState
-  ( Goal
+  ( Env
+  , Subgoal(..)
   , ProofState(..)
   , Tactic
   , prove
@@ -8,11 +9,17 @@ module ProofState
 import Syntax
 import Axioms (Proof(..))
 
-type Goal = Formula
+type Env = [(String, Formula)]
+
+data Subgoal
+  = Subgoal
+  { assumptions :: Env
+  , claim :: Formula
+  }
 
 data ProofState
   = ProofState
-  { currentGoals :: [Goal] -- ^ current subgoals
+  { currentGoals :: [Subgoal] -- ^ current subgoals
   , constructProof :: [Proof] -> Proof -- ^ given proofs for the subgoals, construct a proof for the overall goal
   }
 
@@ -21,7 +28,7 @@ type Tactic = ProofState -> ProofState
 initialProofState :: Formula -> ProofState
 initialProofState goal =
   ProofState
-  { currentGoals = [goal]
+  { currentGoals = [Subgoal { assumptions = [], claim = goal }]
   , constructProof =
       \ps ->
         case ps of
@@ -32,12 +39,18 @@ initialProofState goal =
 extractProof :: ProofState -> Proof
 extractProof state =
   case currentGoals state of
-    [] -> error "to extract a proof, there mustn't be open subgoals"
-    _  -> constructProof state []
+    [] -> constructProof state []
+    _  -> error "to extract a proof, there mustn't be open subgoals"
 
 prove :: Formula -> [Tactic] -> Proof
 prove goal tactics =
-  let p = extractProof (foldl (\state tac -> tac state) (initialProofState goal) tactics)
-  in if getFormula p == goal
-       then p
-       else error "prove: proved statement differs from goal!"
+  let
+    p = extractProof (foldl (\state tac -> tac state) (initialProofState goal) tactics)
+  in
+    if getFormula p == goal then
+      p
+    else
+      error
+        ("prove: Proved statement differs from goal! " ++
+         "Proof shows '" ++ show (getFormula p) ++ "' is true, but the goal was to show that '" ++
+         show goal ++ "' is true.")
