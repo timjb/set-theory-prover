@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Tactics
   ( split
   , left
@@ -27,88 +29,99 @@ liftModusPonens asms fun args =
     translate (abstract asms app)
 
 split :: Tactic
-split =
-  modify' $ \state ->
-  case currentGoals state of
-    [] -> error "split: no goals"
-    (Subgoal { assumptions = asms, claim = phi `And` psi }):otherGoals ->
-      ProofState
-      { currentGoals = Subgoal { assumptions = asms, claim = phi } : Subgoal { assumptions = asms, claim = psi } : otherGoals
-      , constructProof =
-          \subproofs ->
-            case subproofs of
-              phiProof:psiProof:otherProofs ->
-                let phiAndPsiProof = liftModusPonens asms (and_intro phi psi) [phiProof, psiProof]
-                      --translate $ abstract asms $
-                      --  ((LCPrf (and_intro phi psi) `LCApp` apply (LCPrf phiProof) asms) `LCApp` apply (LCPrf psiProof) asms)
-                in constructProof state (phiAndPsiProof:otherProofs)
-              _ -> error "split: expected to get proofs for two subgoals (corresponding to the two conjuncts)"
-      }
-    _ -> error "split: first goal is not of the form φ ∧ ψ"
+split = do
+  state <- get
+  (asms, phi, psi, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "split: no goals"
+      (Subgoal { assumptions = asms, claim = phi `And` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      _:_ -> fail "split: first goal is not of the form φ ∧ ψ"
+  put $
+    ProofState
+    { currentGoals = Subgoal { assumptions = asms, claim = phi } : Subgoal { assumptions = asms, claim = psi } : otherGoals
+    , constructProof =
+        \case
+          phiProof:psiProof:otherProofs ->
+            let phiAndPsiProof = liftModusPonens asms (and_intro phi psi) [phiProof, psiProof]
+                  --translate $ abstract asms $
+                  --  ((LCPrf (and_intro phi psi) `LCApp` apply (LCPrf phiProof) asms) `LCApp` apply (LCPrf psiProof) asms)
+            in constructProof state (phiAndPsiProof:otherProofs)
+          _ -> error "split: expected to get proofs for two subgoals (corresponding to the two conjuncts)"
+    }
 
 left :: Tactic
-left =
-  modify' $ \state ->
-  case currentGoals state of
-    [] -> error "left: no goals"
-    (Subgoal { assumptions = asms, claim = phi `Or` psi }):otherGoals ->
-      ProofState
-      { currentGoals = (Subgoal { assumptions = asms, claim = phi }):otherGoals
-      , constructProof =
-          \subproofs ->
-            case subproofs of
-              [] -> error "left: expected to get proof of at least one subgoal (corresponding to the left disjunct)"
-              phiProof:otherProofs ->
-                let phiOrPsiProof = liftModusPonens asms (or_intro1 phi psi) [phiProof]
-                      --translate (abstract asms (LCPrf (or_intro1 phi psi) `LCApp` apply (LCPrf phiProof) asms))
-                in constructProof state (phiOrPsiProof:otherProofs)
-      }
-    _ -> error "split: first goal is not of the form φ ∨ ψ"
+left = do
+  state <- get
+  (asms, phi, psi, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "left: no goals"
+      (Subgoal { assumptions = asms, claim = phi `Or` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      _:_ -> fail "left: first goal is not of the form φ ∨ ψ"
+  put $
+    ProofState
+    { currentGoals = (Subgoal { assumptions = asms, claim = phi }):otherGoals
+    , constructProof =
+        \case
+          [] -> error "left: expected to get proof of at least one subgoal (corresponding to the left disjunct)"
+          phiProof:otherProofs ->
+            let phiOrPsiProof = liftModusPonens asms (or_intro1 phi psi) [phiProof]
+                  --translate (abstract asms (LCPrf (or_intro1 phi psi) `LCApp` apply (LCPrf phiProof) asms))
+            in constructProof state (phiOrPsiProof:otherProofs)
+    }
 
 -- TODO: right
 
 intro :: String -> Tactic
-intro name =
-  modify' $ \state ->
-  case currentGoals state of
-    [] -> error "intro: no goals"
-    (Subgoal { assumptions = asms, claim = phi `Implies` psi }):otherGoals ->
-      if name `elem` map fst asms then error ("intro: name '" ++ name ++ "' already in scope!") else
-      state
-      { currentGoals = (Subgoal { assumptions = (name, phi):asms, claim = psi }):otherGoals
-      }
-    _ -> error "intro: first goal is not of the form φ ⇒ ψ"
+intro name = do
+  state <- get
+  (asms, phi, psi, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "intro: no goals"
+      (Subgoal { assumptions = asms, claim = phi `Implies` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      _:_ -> fail "intro: first goal is not of the form φ ⇒ ψ"
+  when (name `elem` map fst asms) $
+    fail ("intro: name '" ++ name ++ "' already in scope!")
+  put $
+    state
+    { currentGoals = (Subgoal { assumptions = (name, phi):asms, claim = psi }):otherGoals
+    }
 
 assumption :: String -> Tactic
-assumption name =
-  modify' $ \state ->
-  case currentGoals state of
-    [] -> error "assumption: no goals"
-    (Subgoal { assumptions = asms, claim = formula }):otherGoals ->
-      case lookup name asms of
-        Nothing -> error ("assumption: '" ++ name ++ "' is not an assumption!")
-        Just formula' | formula' /= formula -> error ("assumption '" ++ name ++ "' doesn't prove the current goal!")
-        Just _ ->
-          ProofState
-          { currentGoals = otherGoals
-          , constructProof =
-              \subproofs ->
-                let proof = translate (abstract asms (LCVar name))
-                in constructProof state (proof:subproofs)
-          }
+assumption name = do
+  state <- get
+  (asms, formula, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "assumption: no goals"
+      (Subgoal { assumptions = asms, claim = formula }):otherGoals -> pure (asms, formula, otherGoals)
+  case lookup name asms of
+    Nothing -> fail ("assumption: '" ++ name ++ "' is not an assumption!")
+    Just formula' ->
+      when (formula /= formula') $
+        fail ("assumption '" ++ name ++ "' doesn't prove the current goal!")
+  put $
+    ProofState
+    { currentGoals = otherGoals
+    , constructProof =
+        \subproofs ->
+          let proof = translate (abstract asms (LCVar name))
+          in constructProof state (proof:subproofs)
+    }
 
 exact :: Proof -> Tactic
-exact proof =
-  modify' $ \state ->
-  case currentGoals state of
-    [] -> error "exact: no goals"
-    (Subgoal { claim = firstGoal }):otherGoals ->
-      if firstGoal /= getFormula proof
-        then error "exact: purported proof doesn't prove the first subgoal"
-        else
-          ProofState
-          { currentGoals = otherGoals
-          , constructProof = \subproofs -> constructProof state (proof:subproofs)
-          }
+exact proof = do
+  state <- get
+  (formula, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "exact: no goals"
+      (Subgoal { claim = formula }):otherGoals -> pure (formula, otherGoals)
+  when (formula /= getFormula proof) $
+    fail "exact: purported proof doesn't prove the first subgoal"
+  put $
+    ProofState
+    { currentGoals = otherGoals
+    , constructProof = \subproofs -> constructProof state (proof:subproofs)
+    }
 
+-- TODO: try tactic
+-- TODO: intros tactic
 -- TODO: tactic for local lemmas

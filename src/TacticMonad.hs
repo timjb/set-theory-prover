@@ -4,12 +4,15 @@ module TacticMonad
   ( Env
   , Subgoal(..)
   , ProofState(..)
+  , TacticException(..)
   , TacticM
   , Tactic
+  , prove'
   , prove
   ) where
 
 import Control.Monad.State.Strict
+import Control.Monad.Except
 
 import Syntax
 import Axioms (Proof(..))
@@ -28,10 +31,20 @@ data ProofState
   , constructProof :: [Proof] -> Proof -- ^ given proofs for the subgoals, construct a proof for the overall goal
   }
 
+newtype TacticException
+  = TacticException
+  { errorMsg :: String
+  }
+
 newtype TacticM a
   = TacticM
-  { runTacticM :: State ProofState a
-  } deriving (Functor, Applicative, Monad, MonadState ProofState)
+  { runTacticM :: StateT ProofState (Except TacticException) a
+  } deriving (Functor, Applicative, MonadState ProofState, MonadError TacticException)
+
+instance Monad TacticM where
+  return = pure
+  x >>= f = TacticM (runTacticM x >>= runTacticM . f)
+  fail msg = throwError (TacticException { errorMsg = msg })
 
 type Tactic = TacticM ()
 
@@ -46,21 +59,26 @@ initialProofState goal =
           p:_ -> p
   }
 
-extractProof :: ProofState -> Proof
+extractProof :: ProofState -> Except TacticException Proof
 extractProof (ProofState { currentGoals = currGoals, constructProof = constrPrf }) =
   case currGoals of
-    [] -> constrPrf []
-    _  -> error "to extract a proof, there mustn't be open subgoals"
+    [] -> pure (constrPrf [])
+    _  -> throwError (TacticException "to extract a proof, there mustn't be open subgoals")
+
+prove' :: Formula -> TacticM a -> Either TacticException Proof
+prove' goal script =
+  runExcept $ do
+    proofState <- execStateT (runTacticM script) (initialProofState goal)
+    proof <- extractProof proofState
+    unless (getFormula proof == goal) $
+      throwError $ TacticException $
+        "Proved statement differs from goal! " ++
+        "Proof shows '" ++ show (getFormula proof) ++ "' is true, but the goal was to show that '" ++
+        show goal ++ "' is true."
+    pure proof
 
 prove :: Formula -> TacticM a -> Proof
 prove goal script =
-  let
-    p = extractProof (execState (runTacticM script) (initialProofState goal))
-  in
-    if getFormula p == goal then
-      p
-    else
-      error
-        ("prove: Proved statement differs from goal! " ++
-         "Proof shows '" ++ show (getFormula p) ++ "' is true, but the goal was to show that '" ++
-         show goal ++ "' is true.")
+  case prove' goal script of
+    Left exc  -> error (errorMsg exc)
+    Right prf -> prf
