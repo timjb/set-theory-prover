@@ -1,10 +1,15 @@
-module ProofState
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+module TacticMonad
   ( Env
   , Subgoal(..)
   , ProofState(..)
+  , TacticM
   , Tactic
   , prove
   ) where
+
+import Control.Monad.State.Strict
 
 import Syntax
 import Axioms (Proof(..))
@@ -23,7 +28,12 @@ data ProofState
   , constructProof :: [Proof] -> Proof -- ^ given proofs for the subgoals, construct a proof for the overall goal
   }
 
-type Tactic = ProofState -> ProofState
+newtype TacticM a
+  = TacticM
+  { runTacticM :: State ProofState a
+  } deriving (Functor, Applicative, Monad, MonadState ProofState)
+
+type Tactic = TacticM ()
 
 initialProofState :: Formula -> ProofState
 initialProofState goal =
@@ -37,15 +47,15 @@ initialProofState goal =
   }
 
 extractProof :: ProofState -> Proof
-extractProof state =
-  case currentGoals state of
-    [] -> constructProof state []
+extractProof (ProofState { currentGoals = currGoals, constructProof = constrPrf }) =
+  case currGoals of
+    [] -> constrPrf []
     _  -> error "to extract a proof, there mustn't be open subgoals"
 
-prove :: Formula -> [Tactic] -> Proof
-prove goal tactics =
+prove :: Formula -> TacticM a -> Proof
+prove goal script =
   let
-    p = extractProof (foldl (\state tac -> tac state) (initialProofState goal) tactics)
+    p = extractProof (execState (runTacticM script) (initialProofState goal))
   in
     if getFormula p == goal then
       p

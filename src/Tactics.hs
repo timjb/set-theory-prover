@@ -8,10 +8,10 @@ module Tactics
 
 import Syntax
 import Axioms
-import ProofState
+import TacticMonad
 import LambdaEmbedding
 
-import GHC.Stack
+import Control.Monad.State.Strict hiding (state)
 
 abstract :: Env -> LC -> LC
 abstract env term = foldl (\t (name, formula) -> LCAbs name formula t) term env
@@ -26,8 +26,9 @@ liftModusPonens asms fun args =
   in
     translate (abstract asms app)
 
-split :: HasCallStack => Tactic
-split state =
+split :: Tactic
+split =
+  modify' $ \state ->
   case currentGoals state of
     [] -> error "split: no goals"
     (Subgoal { assumptions = asms, claim = phi `And` psi }):otherGoals ->
@@ -45,8 +46,9 @@ split state =
       }
     _ -> error "split: first goal is not of the form φ ∧ ψ"
 
-left :: HasCallStack => Tactic
-left state =
+left :: Tactic
+left =
+  modify' $ \state ->
   case currentGoals state of
     [] -> error "left: no goals"
     (Subgoal { assumptions = asms, claim = phi `Or` psi }):otherGoals ->
@@ -65,8 +67,9 @@ left state =
 
 -- TODO: right
 
-intro :: HasCallStack => String -> Tactic
-intro name state =
+intro :: String -> Tactic
+intro name =
+  modify' $ \state ->
   case currentGoals state of
     [] -> error "intro: no goals"
     (Subgoal { assumptions = asms, claim = phi `Implies` psi }):otherGoals ->
@@ -76,8 +79,9 @@ intro name state =
       }
     _ -> error "intro: first goal is not of the form φ ⇒ ψ"
 
-assumption :: HasCallStack => String -> Tactic
-assumption name state =
+assumption :: String -> Tactic
+assumption name =
+  modify' $ \state ->
   case currentGoals state of
     [] -> error "assumption: no goals"
     (Subgoal { assumptions = asms, claim = formula }):otherGoals ->
@@ -93,8 +97,9 @@ assumption name state =
                 in constructProof state (proof:subproofs)
           }
 
-exact :: HasCallStack => Proof -> Tactic
-exact proof state =
+exact :: Proof -> Tactic
+exact proof =
+  modify' $ \state ->
   case currentGoals state of
     [] -> error "exact: no goals"
     (Subgoal { claim = firstGoal }):otherGoals ->
