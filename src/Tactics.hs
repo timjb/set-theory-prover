@@ -154,4 +154,13 @@ try script =
     -- TODO: log exception
     pure Nothing
 
--- TODO: tactic for local lemmas
+-- TODO: reflexivity tactic
+-- TODO: rewrite tactic
+-- TODO: tactic for or elimination
+-- TODO: tactic for and elimination
+-- TODO: tactic for lifting lambda terms
+-- TODO: tactic for instantiation of forall
+-- TODO: tactic for contraposition
+-- TODO: tactic for generalization
+-- TODO: tactic for existential introduction
+-- TODO: tactic for introducing local lemmas
