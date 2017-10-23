@@ -3,6 +3,7 @@
 module Tactics
   ( split
   , left
+  , right
   , intro
   , intros
   , assumption
@@ -57,7 +58,7 @@ left = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "left: no goals"
-      (Subgoal { assumptions = asms, claim = phi `Or` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      (Subgoal { assumptions = asms, claim = phi :\/: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "left: first goal is not of the form φ ∨ ψ"
   put $
     ProofState
@@ -71,7 +72,25 @@ left = do
             in constructProof state (phiOrPsiProof:otherProofs)
     }
 
--- TODO: right
+right :: Tactic
+right = do
+  state <- get
+  (asms, phi, psi, otherGoals) <-
+    case currentGoals state of
+      [] -> fail "right: no goals"
+      (Subgoal { assumptions = asms, claim = phi :\/: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      _:_ -> fail "right: first goal is not of the form φ ∨ ψ"
+  put $
+    ProofState
+    { currentGoals = (Subgoal { assumptions = asms, claim = psi }):otherGoals
+    , constructProof =
+        \case
+          [] -> error "right: expected to get proof of at least one subgoal (corresponding to the right disjunct)"
+          psiProof:otherProofs ->
+            let phiOrPsiProof = liftModusPonens asms (or_intro2 phi psi) [psiProof]
+                  --translate (abstract asms (LCPrf (or_intro2 phi psi) `LCApp` apply (LCPrf phiProof) asms))
+            in constructProof state (phiOrPsiProof:otherProofs)
+    }
 
 intro :: String -> Tactic
 intro name = do
@@ -79,7 +98,7 @@ intro name = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "intro: no goals"
-      (Subgoal { assumptions = asms, claim = phi `Implies` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      (Subgoal { assumptions = asms, claim = phi :=>: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "intro: first goal is not of the form φ ⇒ ψ"
   when (name `elem` map fst asms) $
     fail ("intro: name '" ++ name ++ "' already in scope!")

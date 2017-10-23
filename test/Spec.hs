@@ -62,6 +62,7 @@ main = do
     , checkProof (phi :=>: (psi :=>: psi)) (exact (ignoreFirstArg psi phi))
     , checkProof ((psi :=>: xi) :=>: (phi :=>: psi) :=>: (phi :=>: xi)) (exact (compose phi psi xi))
     , tacticProof
+    , checkProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
     , incompleteProof
     , wrongAssumptionName
     ]
