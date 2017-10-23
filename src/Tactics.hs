@@ -8,6 +8,7 @@ module Tactics
   , intros
   , assumption
   , exact
+  , try
   ) where
 
 import Syntax
@@ -16,6 +17,7 @@ import TacticMonad
 import LambdaEmbedding
 
 import Control.Monad (mapM_)
+import Control.Monad.Except (catchError)
 import Control.Monad.State.Strict hiding (state)
 
 abstract :: Env -> LC -> LC
@@ -146,6 +148,10 @@ exact proof = do
     , constructProof = \subproofs -> constructProof state (proof:subproofs)
     }
 
--- TODO: try tactic
--- TODO: intros tactic
+try :: TacticM a -> TacticM (Maybe a)
+try script =
+  catchError (Just <$> script) $ \_exc ->
+    -- TODO: log exception
+    pure Nothing
+
 -- TODO: tactic for local lemmas

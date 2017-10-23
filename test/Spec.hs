@@ -46,6 +46,16 @@ tacticProof =
     left
     assumption "h1"
 
+trySkipsErrors :: Test
+trySkipsErrors =
+  checkProof (phi :=>: phi) $ do
+    intro "h1"
+    res <- try left -- 'left' tactic is not applicable, since goal is not a disjunction
+    case res of
+      Nothing -> pure ()
+      Just () -> fail "expected 'try left' to return 'Nothing'"
+    assumption "h1"
+
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
 
@@ -63,6 +73,7 @@ main = do
     , checkProof ((psi :=>: xi) :=>: (phi :=>: psi) :=>: (phi :=>: xi)) (exact (compose phi psi xi))
     , tacticProof
     , checkProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
+    , trySkipsErrors
     , incompleteProof
     , wrongAssumptionName
     ]
