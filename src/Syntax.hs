@@ -1,8 +1,10 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Syntax
   ( VarName
   , Ctx
   , Term (..)
-  , Formula (..)
+  , Formula (.., (:=>:), (:\/:), (:/\:), (:=:), (:€:))
   -- * Variable management
   , varUnion
   , freshVar
@@ -68,14 +70,31 @@ data Formula
   | Elem Term Term -- ^ Element relation
   deriving (Eq, Show)
 
+infix  4 :=:, :€:
+infixr 3 :/\:
+infixr 2 :\/:
+infixr 1 :=>:
+
+pattern (:=>:), (:\/:), (:/\:) :: Formula -> Formula -> Formula
+pattern f :=>: g = Implies f g
+pattern f :\/: g = Or f g
+pattern f :/\: g = And f g
+
+pattern (:=:), (:€:) :: Term -> Term -> Formula
+pattern f :=: g = Eq f g
+pattern x :€: y  = Elem x y
+
+-- TODO: nice pretty-printing
+
+-- TODO: make pattern synonym?
 iff :: Formula -> Formula -> Formula
-iff phi psi = (phi `Implies` psi) `And` (psi `Implies` phi)
+iff phi psi = (phi :=>: psi) :/\: (psi :=>: phi)
 
 existsUnique :: VarName -> Formula -> Formula
-existsUnique x phi = Exists x (And phi uniquenessOfX)
+existsUnique x phi = Exists x (phi :/\: uniquenessOfX)
   where
     y = freshVar (fvInFormula phi)
-    uniquenessOfX = Forall y (Implies (replaceInFormula x (Var y) phi) (Eq (Var x) (Var y)))
+    uniquenessOfX = Forall y (replaceInFormula x (Var y) phi :=>: (Var x :=: Var y))
 
 fvInFormula :: Formula -> [VarName]
 fvInFormula f =
@@ -112,7 +131,7 @@ freshVar :: [VarName] -> VarName
 freshVar = head . freshVars
 
 truth :: Formula
-truth = Forall x (Var x `Eq` Var x)
+truth = Forall x (Var x :=: Var x)
   where
     x = "x"
 
@@ -122,24 +141,24 @@ falsity = Neg truth
 subset :: Term -> Term -> Formula
 subset s t =
   let x = freshVar (fvInTerm s `varUnion` fvInTerm t)
-  in Forall x ((Var x `Elem` s) `Implies` (Var x `Elem` t))
+  in Forall x (Var x :€: s :=>: Var x :€: t)
 
 superset :: Term -> Term -> Formula
 superset s t = subset t s
 
 -- TODO: make pattern?
 forallIn :: VarName -> Term -> Formula -> Formula
-forallIn x y phi = Forall x ((Var x `Elem` y) `Implies` phi)
+forallIn x y phi = Forall x (Var x :€: y :=>: phi)
 
 -- TODO: make pattern?
 existsIn :: VarName -> Term -> Formula -> Formula
-existsIn x y phi = Exists x ((Var x `Elem` y) `And` phi)
+existsIn x y phi = Exists x (Var x :€: y :/\: phi)
 
 existsUniqueIn :: VarName -> Term -> Formula -> Formula
-existsUniqueIn x y phi = existsUnique x ((Var x `Elem` y) `And` phi)
+existsUniqueIn x y phi = existsUnique x ((Var x :€: y) :/\: phi)
 
 emptySet :: Term
-emptySet = DefDescr name (Forall x (Neg (Var x `Elem` Var name)))
+emptySet = DefDescr name (Forall x (Neg (Var x :€: Var name)))
   where
     name = "∅"
     x = "x"
@@ -147,27 +166,27 @@ emptySet = DefDescr name (Forall x (Neg (Var x `Elem` Var name)))
 pairSet :: Term -> Term -> Term
 pairSet s t =
   let x:y:_ = freshVars (fvInTerm s `varUnion` fvInTerm t)
-  in DefDescr x (Forall y ((Var y `Elem` Var x) `iff` ((Var y `Eq` s) `Or` (Var y `Eq` t))))
+  in DefDescr x (Forall y ((Var y :€: Var x) `iff` (Var y :=: s :\/: Var y :=: t)))
 
 singletonSet :: Term -> Term
 singletonSet t =
   let x:y:_ = freshVars (fvInTerm t)
-  in DefDescr x (Forall y ((Var y `Elem` Var x) `iff` (Var y `Eq` t)))
+  in DefDescr x (Forall y ((Var y :€: Var x) `iff` (Var y :=: t)))
 
 -- | '{ x ∈ y | phi }'
 comprehension :: VarName -> Term -> Formula -> Term
-comprehension x y phi = DefDescr u (Forall x (Elem (Var x) (Var u) `iff` (Elem (Var x) y `And` phi)))
+comprehension x y phi = DefDescr u (Forall x ((Var x :€: Var u) `iff` (Var x :€: y :/\: phi)))
   where
     u = freshVar ([x] `varUnion` (fvInTerm y `varUnion` fvInFormula phi))
 
 logicalToSetOperator :: (Formula -> Formula -> Formula) -> Term -> Term -> Term
 logicalToSetOperator op x y =
-  DefDescr u (Forall v ((Var v `Elem` Var u) `iff` ((Var v `Elem` x) `op` (Var v `Elem` y))))
+  DefDescr u (Forall v ((Var v :€: Var u) `iff` ((Var v :€: x) `op` (Var v :€: y))))
   where
     u:v:_ = freshVars (fvInTerm x `varUnion` fvInTerm y)
 
 intersection :: Term -> Term -> Term
-intersection = logicalToSetOperator And
+intersection = logicalToSetOperator (:/\:)
 
 union :: Term -> Term -> Term
-union = logicalToSetOperator Or
+union = logicalToSetOperator (:\/:)

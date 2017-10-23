@@ -34,7 +34,7 @@ split = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "split: no goals"
-      (Subgoal { assumptions = asms, claim = phi `And` psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      (Subgoal { assumptions = asms, claim = phi :/\: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "split: first goal is not of the form φ ∧ ψ"
   put $
     ProofState

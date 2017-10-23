@@ -35,13 +35,13 @@ checkNoProof reason formula script =
       pure False
 
 phi, psi, xi :: Formula
-phi = Var "x" `Elem` Var "s"
-psi = Var "y" `Elem` Var "s"
-xi  = Var "z" `Elem` Var "s"
+phi = Var "x" :€: Var "s"
+psi = Var "y" :€: Var "s"
+xi  = Var "z" :€: Var "s"
 
 tacticProof :: Test
 tacticProof =
-  checkProof (psi `Implies` (phi `Implies` (psi `Or` phi))) $ do
+  checkProof (psi :=>: phi :=>: psi :\/: phi) $ do
     intro "h1"
     intro "h2"
     left
@@ -52,18 +52,16 @@ incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
 
 wrongAssumptionName :: Test
 wrongAssumptionName =
-  checkNoProof "there is no assumption named \"g\" in scope" (psi `Implies` psi) $ do
+  checkNoProof "there is no assumption named \"g\" in scope" (psi :=>: psi) $ do
     intro "h"
     assumption "g"
 
 main :: IO ()
 main = do
   results <- sequence
-    [ checkProof (phi `Implies` phi) (exact (ax1 phi))
-    , checkProof (phi `Implies` (psi `Implies` psi)) (exact (ignoreFirstArg psi phi))
-    , checkProof
-        ((psi `Implies` xi) `Implies` ((phi `Implies` psi) `Implies` (phi `Implies` xi)))
-        (exact (compose phi psi xi))
+    [ checkProof (phi :=>: phi) (exact (ax1 phi))
+    , checkProof (phi :=>: (psi :=>: psi)) (exact (ignoreFirstArg psi phi))
+    , checkProof ((psi :=>: xi) :=>: (phi :=>: psi) :=>: (phi :=>: xi)) (exact (compose phi psi xi))
     , tacticProof
     , incompleteProof
     , wrongAssumptionName
