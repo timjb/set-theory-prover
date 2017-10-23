@@ -42,8 +42,7 @@ xi  = Var "z" :€: Var "s"
 tacticProof :: Test
 tacticProof =
   checkProof (psi :=>: phi :=>: psi :\/: phi) $ do
-    intro "h1"
-    intro "h2"
+    intros ["h1", "h2"]
     left
     assumption "h1"
 

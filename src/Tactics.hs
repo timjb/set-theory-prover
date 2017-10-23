@@ -4,6 +4,7 @@ module Tactics
   ( split
   , left
   , intro
+  , intros
   , assumption
   , exact
   ) where
@@ -13,6 +14,7 @@ import Axioms
 import TacticMonad
 import LambdaEmbedding
 
+import Control.Monad (mapM_)
 import Control.Monad.State.Strict hiding (state)
 
 abstract :: Env -> LC -> LC
@@ -85,6 +87,9 @@ intro name = do
     state
     { currentGoals = (Subgoal { assumptions = (name, phi):asms, claim = psi }):otherGoals
     }
+
+intros :: [String] -> Tactic
+intros = mapM_ intro
 
 assumption :: String -> Tactic
 assumption name = do
