@@ -1,7 +1,12 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module LambdaEmbedding
   (
   -- * Translating lambda terms to proofs
     LC(..)
+  , pattern (:::)
+  , pattern (:->)
+  , pattern (:@)
   , translate
   ) where
 
@@ -11,15 +16,29 @@ import Axioms
 import Data.Maybe (fromMaybe)
 
 data LC
-  = LCAbs VarName Formula LC -- ^ lambda abstraction
+  = LCAbs (VarName, Formula) LC -- ^ lambda abstraction
   | LCApp LC LC              -- ^ application
   | LCVar VarName            -- ^ variable
   | LCPrf Proof              -- ^ proof
 
+
+infix 8 :::
+infixl 4 :@
+infixr 1 :->
+
+pattern (:::) :: VarName -> Formula -> (VarName, Formula)
+pattern x ::: y = (x, y)
+
+pattern (:->) :: (VarName, Formula) -> LC -> LC
+pattern arg :-> t = LCAbs arg t
+
+pattern (:@) :: LC -> LC -> LC
+pattern s :@ t = LCApp s t
+
 freeVariables :: LC -> [VarName]
 freeVariables t =
   case t of
-    LCAbs x _ s -> filter (/= x) (freeVariables s)
+    LCAbs arg s -> filter (/= fst arg) (freeVariables s)
     LCApp u v   -> freeVariables u `varUnion` freeVariables v
     LCVar x     -> [x]
     LCPrf _     -> []
@@ -45,24 +64,24 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
                   then (LCApp fun' arg', psi)
                   else error "translate: argument types don't match!"
               _ -> error "translate: expected a function type!"
-        LCAbs x phi body ->
+        LCAbs (x, phi) body ->
           case body of
-            LCVar y | y == x -> (LCPrf (ax1 phi), phi `Implies` phi)
+            LCVar y | y == x -> (LCPrf (ax1 phi), phi :=>: phi)
             LCApp fun arg | x `elem` freeVariables body ->
               let
-                (fun', funType) = go env (LCAbs x phi fun)
-                (arg', _argType) = go env (LCAbs x phi arg)
+                (fun', funType) = go env (LCAbs (x, phi) fun)
+                (arg', _argType) = go env (LCAbs (x, phi) arg)
               in
                 case funType of
-                  Implies phi' (Implies psi xi) | phi == phi' ->
+                  phi' :=>: (psi :=>: xi) | phi == phi' ->
                     ((LCPrf (ax3 phi psi xi) `LCApp` fun') `LCApp` arg', phi `Implies` xi)
                   _ -> error "translate: expected a function type with two arguments, the first of which is phi!"
-            LCAbs _ _ _ | x `elem` freeVariables body ->
+            LCAbs _ _ | x `elem` freeVariables body ->
               let
                 env' = (x,phi):env
                 (body', _) = go env' body
               in
-                go env (LCAbs x phi body')
+                go env (LCAbs (x, phi) body')
             _ -> -- x is not free in body
               let
                 (body', bodyType) = go env body
@@ -74,5 +93,5 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
       case term of
         LCPrf p -> p
         LCApp fun arg -> extract fun `mp` extract arg
-        LCAbs _ _ _ -> error "translate: didn't expect function in extract"
+        LCAbs _ _ -> error "translate: didn't expect function in extract"
         LCVar _ -> error "translate: didn't expect variable in extract"

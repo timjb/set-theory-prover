@@ -16,7 +16,7 @@ import LambdaEmbedding
 import Control.Monad.State.Strict hiding (state)
 
 abstract :: Env -> LC -> LC
-abstract env term = foldl (\t (name, formula) -> LCAbs name formula t) term env
+abstract env term = foldl (flip LCAbs) term env
 
 apply :: LC -> Env -> LC
 apply term env = foldr (\(v, _) t -> LCApp t (LCVar v)) term env
@@ -24,7 +24,7 @@ apply term env = foldr (\(v, _) t -> LCApp t (LCVar v)) term env
 liftModusPonens :: Env -> Proof -> [Proof] -> Proof
 liftModusPonens asms fun args =
   let
-    app = foldl (\t arg -> LCApp t (apply (LCPrf arg) asms)) (LCPrf fun) args
+    app = foldl (\t arg -> t :@ apply (LCPrf arg) asms) (LCPrf fun) args
   in
     translate (abstract asms app)
 

@@ -11,7 +11,8 @@ import LambdaEmbedding
 
 -- | Schema 'ψ ⇒ φ ⇒ φ'
 ignoreFirstArg :: Formula -> Formula -> Proof
-ignoreFirstArg phi psi = translate (LCAbs "x" psi (LCAbs "y" phi (LCVar "y")))
+ignoreFirstArg phi psi =
+  translate ("x" ::: psi :-> "y" ::: phi :-> LCVar "y")
   --let
   --  step1 = ax2 (phi `Implies` phi) psi -- (φ ⇒ φ) ⇒ ψ ⇒ φ ⇒ φ
   --  step2 = ax1 phi                     -- φ ⇒ φ
@@ -23,7 +24,7 @@ ignoreFirstArg phi psi = translate (LCAbs "x" psi (LCAbs "y" phi (LCVar "y")))
 compose :: Formula -> Formula -> Formula -> Proof
 compose phi psi xi =
   translate $
-    LCAbs "f" (psi `Implies` xi) $
-      LCAbs "g" (phi `Implies` psi) $
-        LCAbs "x" phi $
-          LCVar "f" `LCApp` (LCVar "g" `LCApp` LCVar "x")
+    "f" ::: (psi :=>: xi) :->
+      "g" ::: (phi `Implies` psi) :->
+        "x" ::: phi :->
+          LCVar "f" :@ (LCVar "g" :@ LCVar "x")
