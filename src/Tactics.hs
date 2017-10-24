@@ -276,7 +276,6 @@ contraposition = do
     }
 
 -- TODO: rewrite tactic
--- TODO: tactic for and elimination
 -- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall
 -- TODO: tactic for generalization

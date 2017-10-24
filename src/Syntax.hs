@@ -35,6 +35,8 @@ module Syntax
   , pairSet
   ) where
 
+import Data.String (IsString(..))
+
 type VarName = String
 type Ctx = [VarName]
 
@@ -45,7 +47,24 @@ varUnion xs ys = xs ++ filter (`notElem` xs) ys
 data Term
   = Var VarName
   | DefDescr VarName Formula -- ^ definite descriptor
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance IsString Term where
+  fromString = Var
+
+instance Show Term where
+  showsPrec ctxPrec term =
+    case term of
+      Var name -> showsPrec ctxPrec name
+      DefDescr x phi ->
+        let
+          showsFn = showsPrec 10 x . (" " ++) . showsPrec 10 phi
+        in if appPrec < ctxPrec then
+          ("(" ++) . showsFn . (")" ++)
+        else
+          showsFn
+    where
+      appPrec = 10
 
 fvInTerm :: Term -> [VarName]
 fvInTerm (Var x) = [x]
@@ -68,7 +87,32 @@ data Formula
   | Exists VarName Formula -- ^ existential quantification
   -- Set-theory
   | Elem Term Term -- ^ Element relation
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show Formula where
+  showsPrec ctxPrec formula =
+    case formula of
+      Implies phi psi -> parenthesise impliesPrec $ showsPrec' impliesPrec phi . (" :=>: " ++) . showsPrec' impliesPrec psi
+      And     phi psi -> parenthesise andPrec (showsPrec' andPrec phi . (" :/\\: " ++) . showsPrec' andPrec psi)
+      Or      phi psi -> parenthesise orPrec (showsPrec' orPrec phi . (" :\\/: " ++) . showsPrec' orPrec psi)
+      Neg     phi     -> parenthesise appPrec (("Neg " ++) . showsPrec' appPrec phi)
+      Eq      s   t   -> parenthesise eqPrec (showsPrec' eqPrec s . (" :=: " ++) . showsPrec' eqPrec t)
+      Forall  x   phi -> parenthesise appPrec (("Forall " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Exists  x   phi -> parenthesise appPrec (("Exists " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Elem    s   t   -> parenthesise elemPrec (showsPrec' elemPrec s . (" :€: " ++) . showsPrec' elemPrec t)
+    where
+      showsPrec' p = showsPrec (p+1)
+      eqPrec = 4
+      elemPrec = 4
+      andPrec = 3
+      orPrec = 2
+      impliesPrec = 1
+      appPrec = 10
+      parenthesise opPrec showsFn =
+        if opPrec < ctxPrec then
+          ("(" ++) . showsFn . (")" ++)
+        else
+          showsFn
 
 infix  4 :=:, :€:
 infixr 3 :/\:
