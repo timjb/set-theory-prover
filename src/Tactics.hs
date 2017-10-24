@@ -11,6 +11,7 @@ module Tactics
   , try
   , refl
   , cases
+  , destruct
   , contraposition
   ) where
 
@@ -43,7 +44,7 @@ split = do
     case currentGoals state of
       [] -> fail "split: no goals"
       Subgoal { assumptions = asms, claim = phi :/\: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
-      _:_ -> fail "split: first goal is not of the form φ ∧ ψ"
+      _:_ -> fail "split: first goal is not of the form 'phi :/\\: psi'"
   put $
     ProofState
     { currentGoals = Subgoal { assumptions = asms, claim = phi } : Subgoal { assumptions = asms, claim = psi } : otherGoals
@@ -64,7 +65,7 @@ left = do
     case currentGoals state of
       [] -> fail "left: no goals"
       Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
-      _:_ -> fail "left: first goal is not of the form φ ∨ ψ"
+      _:_ -> fail "left: first goal is not of the form 'phi :\\/: psi'"
   put $
     ProofState
     { currentGoals = Subgoal { assumptions = asms, claim = phi } : otherGoals
@@ -84,7 +85,7 @@ right = do
     case currentGoals state of
       [] -> fail "right: no goals"
       Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
-      _:_ -> fail "right: first goal is not of the form φ ∨ ψ"
+      _:_ -> fail "right: first goal is not of the form 'phi :\\/: psi'"
   put $
     ProofState
     { currentGoals = Subgoal { assumptions = asms, claim = psi } : otherGoals
@@ -104,7 +105,7 @@ intro name = do
     case currentGoals state of
       [] -> fail "intro: no goals"
       Subgoal { assumptions = asms, claim = phi :=>: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
-      _:_ -> fail "intro: first goal is not of the form φ ⇒ ψ"
+      _:_ -> fail "intro: first goal is not of the form 'phi :=>: psi'"
   when (name `elem` map fst asms) $
     fail ("intro: name '" ++ name ++ "' already in scope!")
   put $
@@ -216,6 +217,41 @@ cases name = do
             (key, val) : rest
           else
             (key1, val1) : set key val rest
+
+destruct :: String -> String -> String -> Tactic
+destruct asmName leftAsmName rightAsmName = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "destruct: no goals"
+      subgoal : otherGoals -> pure (subgoal, otherGoals)
+  (phi, psi) <-
+    case lookup asmName asms of
+      Nothing -> fail ("cases: '" ++ asmName ++ "' is not an assumption!")
+      Just (phi :/\: psi) -> pure (phi, psi)
+      Just _ -> fail ("cases: assumption '" ++ asmName ++ "' is not of the form 'phi :/\\: psi'!")
+  when (leftAsmName `elem` map fst asms) $
+    fail ("destruct: name '" ++ leftAsmName ++ "' already in scope!")
+  when (rightAsmName `elem` map fst asms) $
+    fail ("destruct: name '" ++ rightAsmName ++ "' already in scope!")
+  let
+    asms' = (rightAsmName, psi) : (leftAsmName, phi) : asms
+  put $
+    ProofState
+    { currentGoals = Subgoal { assumptions = asms', claim = target } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "destruct: expected to get at least one proof!"
+          subgoalProof':otherProofs ->
+            let
+              subgoalProof =
+                translate $ abstract asms $
+                  apply (LCPrf subgoalProof') asms
+                    :@ (LCPrf (and_elim1 phi psi) :@ LCVar asmName)
+                    :@ (LCPrf (and_elim2 phi psi) :@ LCVar asmName)
+            in
+              constructProof state (subgoalProof:otherProofs)
+    }
 
 contraposition :: Tactic
 contraposition = do

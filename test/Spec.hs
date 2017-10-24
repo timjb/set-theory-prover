@@ -78,6 +78,15 @@ contradiction =
     intro "_"
     assumption "notPhi"
 
+andCommutative :: Test
+andCommutative =
+  checkProof (phi :/\: psi :=>: psi :/\: phi) $ do
+    intro "h"
+    destruct "h" "hl" "hr"
+    split
+    assumption "hr"
+    assumption "hl"
+
 -- TODO:
 --   phi :=>: Neg (Neg phi)
 --   phi :/\: (psi :\/: xi) :=>: (phi :/\: psi) :\/: (phi :/\: xi)
@@ -103,6 +112,7 @@ main = do
     , reflProof
     , orCommutative
     , contradiction
+    , andCommutative
     , incompleteProof
     , wrongAssumptionName
     ]
