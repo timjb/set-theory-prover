@@ -92,14 +92,20 @@ data Formula
 instance Show Formula where
   showsPrec ctxPrec formula =
     case formula of
-      Implies phi psi -> parenthesise impliesPrec $ showsPrec' impliesPrec phi . (" :=>: " ++) . showsPrec' impliesPrec psi
-      And     phi psi -> parenthesise andPrec (showsPrec' andPrec phi . (" :/\\: " ++) . showsPrec' andPrec psi)
-      Or      phi psi -> parenthesise orPrec (showsPrec' orPrec phi . (" :\\/: " ++) . showsPrec' orPrec psi)
-      Neg     phi     -> parenthesise appPrec (("Neg " ++) . showsPrec' appPrec phi)
-      Eq      s   t   -> parenthesise eqPrec (showsPrec' eqPrec s . (" :=: " ++) . showsPrec' eqPrec t)
-      Forall  x   phi -> parenthesise appPrec (("Forall " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
-      Exists  x   phi -> parenthesise appPrec (("Exists " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
-      Elem    s   t   -> parenthesise elemPrec (showsPrec' elemPrec s . (" :€: " ++) . showsPrec' elemPrec t)
+      Implies phi psi ->
+        let showsPsi = case psi of { Implies _ _ -> showsPrec 0; _ -> showsPrec' impliesPrec }
+        in parenthesise impliesPrec $ showsPrec' impliesPrec phi . (" :=>: " ++) . showsPsi psi
+      And phi psi ->
+        let showsPsi = case psi of { And _ _ -> showsPrec 0; _ -> showsPrec' andPrec }
+        in parenthesise andPrec (showsPrec' andPrec phi . (" :/\\: " ++) . showsPsi psi)
+      Or phi psi ->
+        let showsPsi = case psi of { Or _ _ -> showsPrec 0; _ -> showsPrec' orPrec }
+        in parenthesise orPrec (showsPrec' orPrec phi . (" :\\/: " ++) . showsPsi psi)
+      Neg phi      -> parenthesise appPrec (("Neg " ++) . showsPrec' appPrec phi)
+      Eq s t       -> parenthesise eqPrec (showsPrec' eqPrec s . (" :=: " ++) . showsPrec' eqPrec t)
+      Forall x phi -> parenthesise appPrec (("Forall " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Exists x phi -> parenthesise appPrec (("Exists " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Elem s t     -> parenthesise elemPrec (showsPrec' elemPrec s . (" :€: " ++) . showsPrec' elemPrec t)
     where
       showsPrec' p = showsPrec (p+1)
       eqPrec = 4
