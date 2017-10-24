@@ -70,6 +70,18 @@ orCommutative =
     right; assumption "h"
     left; assumption "h"
 
+contradiction :: Test
+contradiction =
+  checkProof (Neg phi :=>: phi :=>: falsity) $ do
+    intro "notPhi"
+    contraposition
+    intro "_"
+    assumption "notPhi"
+
+-- TODO:
+--   phi :=>: Neg (Neg phi)
+--   phi :/\: (psi :\/: xi) :=>: (phi :/\: psi) :\/: (phi :/\: xi)
+
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
 
@@ -90,6 +102,7 @@ main = do
     , trySkipsErrors
     , reflProof
     , orCommutative
+    , contradiction
     , incompleteProof
     , wrongAssumptionName
     ]

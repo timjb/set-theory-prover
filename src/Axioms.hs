@@ -82,9 +82,9 @@ ax2 phi psi = Proof (phi :=>: psi :=>: phi)
 ax3 :: Formula -> Formula -> Formula -> Proof
 ax3 phi psi xi = Proof ((phi :=>: psi :=>: xi) :=>: (phi :=>: psi) :=>: (phi :=>: xi))
 
--- | Axiom schema '(¬φ ⇒ ¬ψ) ⇒ ψ ⇒ φ
+-- | Axiom schema '(¬ψ ⇒ ¬φ) ⇒ φ ⇒ ψ
 ax4 :: Formula -> Formula -> Proof
-ax4 phi psi = Proof ((Neg phi :=>: Neg psi) :=>: psi :=>: phi)
+ax4 phi psi = Proof ((Neg psi :=>: Neg phi) :=>: phi :=>: psi)
 
 -- | Axiom schema '(∀x. φ) ⇒ φ[x := t]'
 ax5 :: VarName -> Term -> Formula -> Proof

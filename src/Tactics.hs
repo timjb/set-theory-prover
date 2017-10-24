@@ -11,6 +11,7 @@ module Tactics
   , try
   , refl
   , cases
+  , contraposition
   ) where
 
 import Syntax
@@ -216,11 +217,32 @@ cases name = do
           else
             (key1, val1) : set key val rest
 
+contraposition :: Tactic
+contraposition = do
+  state <- get
+  (asms, phi, psi, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "contraposition: no goals"
+      Subgoal { assumptions = asms, claim = phi :=>: psi } : otherSubgoals ->
+        pure (asms, phi, psi, otherSubgoals)
+      _:_ -> fail "contraposition: goal is not of the form 'phi :=>: psi'"
+  put $
+    ProofState
+    { currentGoals = Subgoal { assumptions = asms, claim = Neg psi :=>: Neg phi } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "contraposition: expected to get at least one proof"
+          contrapositionProof:otherProofs ->
+            let
+              implicationProof = translate (abstract asms (LCPrf (ax4 phi psi) :@ apply (LCPrf contrapositionProof) asms))
+            in
+              constructProof state (implicationProof:otherProofs)
+    }
+
 -- TODO: rewrite tactic
 -- TODO: tactic for and elimination
 -- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall
--- TODO: tactic for contraposition
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: tactic for introducing local lemmas
