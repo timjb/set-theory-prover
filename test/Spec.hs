@@ -56,6 +56,12 @@ trySkipsErrors =
       Just () -> fail "expected 'try left' to return 'Nothing'"
     assumption "h1"
 
+reflProof :: Test
+reflProof =
+  checkProof (phi :=>: Var "x" :=: Var "x") $ do
+    intro "h"
+    refl
+
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
 
@@ -74,6 +80,7 @@ main = do
     , tacticProof
     , checkProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
     , trySkipsErrors
+    , reflProof
     , incompleteProof
     , wrongAssumptionName
     ]

@@ -25,6 +25,6 @@ compose :: Formula -> Formula -> Formula -> Proof
 compose phi psi xi =
   translate $
     "f" ::: (psi :=>: xi) :->
-      "g" ::: (phi `Implies` psi) :->
+      "g" ::: (phi :=>: psi) :->
         "x" ::: phi :->
           LCVar "f" :@ (LCVar "g" :@ LCVar "x")

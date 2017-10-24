@@ -9,6 +9,7 @@ module Tactics
   , assumption
   , exact
   , try
+  , refl
   ) where
 
 import Syntax
@@ -154,7 +155,22 @@ try script =
     -- TODO: log exception
     pure Nothing
 
--- TODO: reflexivity tactic
+refl :: Tactic
+refl = do
+  state <- get
+  case currentGoals state of
+    [] -> fail "refl: no goals"
+    (Subgoal { assumptions = asms, claim = s :=: t }):otherGoals -> do
+      when (s /= t) $
+        fail "refl: terms not equal!"
+      let reflProof = translate (abstract asms (LCPrf (ax8 s)))
+      put $
+        ProofState
+        { currentGoals = otherGoals
+        , constructProof = \subproofs -> constructProof state (reflProof:subproofs)
+        }
+    _:_ -> fail "refl: goal must be of the form 's :=: t'!"
+
 -- TODO: rewrite tactic
 -- TODO: tactic for or elimination
 -- TODO: tactic for and elimination
