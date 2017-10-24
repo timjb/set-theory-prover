@@ -62,6 +62,14 @@ reflProof =
     intro "h"
     refl
 
+orCommutative :: Test
+orCommutative =
+  checkProof (phi :\/: psi :=>: psi :\/: phi) $ do
+    intro "h"
+    cases "h"
+    right; assumption "h"
+    left; assumption "h"
+
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
 
@@ -81,6 +89,7 @@ main = do
     , checkProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
     , trySkipsErrors
     , reflProof
+    , orCommutative
     , incompleteProof
     , wrongAssumptionName
     ]

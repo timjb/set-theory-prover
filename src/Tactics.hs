@@ -10,6 +10,7 @@ module Tactics
   , exact
   , try
   , refl
+  , cases
   ) where
 
 import Syntax
@@ -40,7 +41,7 @@ split = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "split: no goals"
-      (Subgoal { assumptions = asms, claim = phi :/\: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      Subgoal { assumptions = asms, claim = phi :/\: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "split: first goal is not of the form φ ∧ ψ"
   put $
     ProofState
@@ -61,11 +62,11 @@ left = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "left: no goals"
-      (Subgoal { assumptions = asms, claim = phi :\/: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "left: first goal is not of the form φ ∨ ψ"
   put $
     ProofState
-    { currentGoals = (Subgoal { assumptions = asms, claim = phi }):otherGoals
+    { currentGoals = Subgoal { assumptions = asms, claim = phi } : otherGoals
     , constructProof =
         \case
           [] -> error "left: expected to get proof of at least one subgoal (corresponding to the left disjunct)"
@@ -81,11 +82,11 @@ right = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "right: no goals"
-      (Subgoal { assumptions = asms, claim = phi :\/: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "right: first goal is not of the form φ ∨ ψ"
   put $
     ProofState
-    { currentGoals = (Subgoal { assumptions = asms, claim = psi }):otherGoals
+    { currentGoals = Subgoal { assumptions = asms, claim = psi } : otherGoals
     , constructProof =
         \case
           [] -> error "right: expected to get proof of at least one subgoal (corresponding to the right disjunct)"
@@ -101,13 +102,13 @@ intro name = do
   (asms, phi, psi, otherGoals) <-
     case currentGoals state of
       [] -> fail "intro: no goals"
-      (Subgoal { assumptions = asms, claim = phi :=>: psi }):otherGoals -> pure (asms, phi, psi, otherGoals)
+      Subgoal { assumptions = asms, claim = phi :=>: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "intro: first goal is not of the form φ ⇒ ψ"
   when (name `elem` map fst asms) $
     fail ("intro: name '" ++ name ++ "' already in scope!")
   put $
     state
-    { currentGoals = (Subgoal { assumptions = (name, phi):asms, claim = psi }):otherGoals
+    { currentGoals = Subgoal { assumptions = (name, phi):asms, claim = psi } : otherGoals
     }
 
 intros :: [String] -> Tactic
@@ -119,7 +120,7 @@ assumption name = do
   (asms, formula, otherGoals) <-
     case currentGoals state of
       [] -> fail "assumption: no goals"
-      (Subgoal { assumptions = asms, claim = formula }):otherGoals -> pure (asms, formula, otherGoals)
+      Subgoal { assumptions = asms, claim = formula } : otherGoals -> pure (asms, formula, otherGoals)
   case lookup name asms of
     Nothing -> fail ("assumption: '" ++ name ++ "' is not an assumption!")
     Just formula' ->
@@ -140,7 +141,7 @@ exact proof = do
   (formula, otherGoals) <-
     case currentGoals state of
       [] -> fail "exact: no goals"
-      (Subgoal { claim = formula }):otherGoals -> pure (formula, otherGoals)
+      Subgoal { claim = formula } : otherGoals -> pure (formula, otherGoals)
   when (formula /= getFormula proof) $
     fail "exact: purported proof doesn't prove the first subgoal"
   put $
@@ -160,7 +161,7 @@ refl = do
   state <- get
   case currentGoals state of
     [] -> fail "refl: no goals"
-    (Subgoal { assumptions = asms, claim = s :=: t }):otherGoals -> do
+    Subgoal { assumptions = asms, claim = s :=: t } : otherGoals -> do
       when (s /= t) $
         fail "refl: terms not equal!"
       let reflProof = translate (abstract asms (LCPrf (ax8 s)))
@@ -171,8 +172,51 @@ refl = do
         }
     _:_ -> fail "refl: goal must be of the form 's :=: t'!"
 
+cases :: String -> Tactic
+cases name = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "cases: no goals"
+      subgoal : otherGoals -> pure (subgoal, otherGoals)
+  (phi, psi) <-
+    case lookup name asms of
+      Nothing -> fail ("cases: '" ++ name ++ "' is not an assumption!")
+      Just (phi :\/: psi) -> pure (phi, psi)
+      Just _ -> fail ("cases: assumption '" ++ name ++ "' is not of the form 'phi :\\/: psi'!")
+  let
+    asmsWithPhi = set name phi asms
+    asmsWithPsi = set name psi asms
+    subgoalWithPhi = Subgoal { assumptions = asmsWithPhi, claim = target }
+    subgoalWithPsi = Subgoal { assumptions = asmsWithPsi, claim = target }
+  put $
+    ProofState
+    { currentGoals = subgoalWithPhi : subgoalWithPsi : otherSubgoals
+    , constructProof =
+        \case
+          subgoalProofWithPhi:subgoalProofWithPsi:otherProofs ->
+            let
+              subgoalProof =
+                translate $ abstract asms $
+                  LCPrf (or_elim phi psi target)
+                    :@ (name ::: phi :-> apply (LCPrf subgoalProofWithPhi) asmsWithPhi)
+                    :@ (name ::: psi :-> apply (LCPrf subgoalProofWithPsi) asmsWithPsi)
+                    :@ LCVar name
+            in constructProof state (subgoalProof:otherProofs)
+          _ -> error "cases: expected to get at least two proofs (for the claim, one assuming phi, one assuming psi)"
+    }
+  where
+    set :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
+    set key val assocList =
+      case assocList of
+        [] -> [(key, val)]
+        (key1, val1) : rest ->
+          if key1 == key then
+            (key, val) : rest
+          else
+            (key1, val1) : set key val rest
+
 -- TODO: rewrite tactic
--- TODO: tactic for or elimination
 -- TODO: tactic for and elimination
 -- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall
@@ -180,3 +224,4 @@ refl = do
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: tactic for introducing local lemmas
+-- TODO: ex falso tactic
