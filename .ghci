@@ -1,1 +1,5 @@
 :set -XOverloadedStrings
+-- enable multiline input:
+:set +m
+:set prompt "\n\ESC[37;44mSetTheoryProver>\ESC[m "
+:set prompt-cont "\ESC[36;44m...............>\ESC[m "
