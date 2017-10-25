@@ -27,7 +27,8 @@ library
     SetTheoryProver.Lib.Logic
   build-depends:
     base >= 4.7 && < 5,
-    mtl
+    mtl,
+    ansi-terminal
   default-language:    Haskell2010
 
 test-suite set-theory-prover-test

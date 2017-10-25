@@ -9,6 +9,7 @@ module SetTheoryProver.Interactive.TacticMonad
   , Tactic
   , prove'
   , prove
+  , interactive
   ) where
 
 import SetTheoryProver.Core.Syntax
@@ -16,6 +17,8 @@ import SetTheoryProver.Core.Axioms (Proof(..))
 
 import Control.Monad.State.Strict
 import Control.Monad.Except
+
+import System.Console.ANSI
 
 type Env = [(String, Formula)]
 
@@ -84,3 +87,59 @@ prove goal script =
   case prove' goal script of
     Left exc  -> error (errorMsg exc)
     Right prf -> prf
+
+printSubgoal :: Subgoal -> IO ()
+printSubgoal (Subgoal { assumptions = asms, claim = target }) = do
+  let
+    nameColWidth    = foldl max 1 (map (length . fst) asms)
+    colGap          = "  "
+    formulaColWidth = foldl max 6 (map (length . show . snd) asms)
+    totalWidth      = max (length (show target)) (nameColWidth + length colGap + formulaColWidth)
+  forM_ asms $ \(name, formula) -> do
+    setSGR [SetColor Foreground Vivid Blue]
+    putStr (padLeft nameColWidth name)
+    setSGR [Reset]
+    putStr colGap
+    putStrLn (show formula)
+  putStrLn (replicate totalWidth '-')
+  putStrLn (show target)
+  where
+    padLeft n str = replicate (max 0 (n - length str)) ' ' ++ str
+
+interactive :: Formula -> TacticM a -> IO (Maybe a)
+interactive goal script = do
+  case runExcept (runStateT (runTacticM script) (initialProofState goal)) of
+    Left (TacticException msg) -> do
+      outputErrorMsg msg
+      pure Nothing
+    Right (res, proofState) -> do
+      unless (null (proofLog proofState)) $ do
+        forM_ (proofLog proofState) $ \msg -> do
+          setSGR [SetColor Foreground Vivid Blue]
+          putStrLn msg
+          setSGR [Reset]
+        putStrLn ""
+      case currentGoals proofState of
+        [] -> do
+          let
+            proof = constructProof proofState []
+          unless (getFormula proof == goal) $
+            outputErrorMsg $ unlines
+              [ "Proved statement differs from goal! Proof shows that"
+              , "  " ++ show (getFormula proof)
+              , "is true, but the goal was to show that"
+              , "  " ++ show goal
+              , "is true."
+              ]
+        [subgoal] -> do
+          putStrLn "Finished with one open subgoal:\n"
+          printSubgoal subgoal
+        subgoal:_:_ -> do
+          putStrLn ("Finished with " ++ show (length (currentGoals proofState)) ++ " open subgoals, the first of which is\n")
+          printSubgoal subgoal
+      pure (Just res)
+  where
+    outputErrorMsg msg = do
+      setSGR [SetColor Foreground Vivid Red]
+      mapM_ putStrLn (zipWith (++) ("✘ " : repeat "  ") (lines msg))
+      setSGR [Reset]
