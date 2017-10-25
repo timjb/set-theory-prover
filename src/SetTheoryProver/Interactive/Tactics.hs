@@ -15,6 +15,7 @@ module SetTheoryProver.Interactive.Tactics
   , destruct
   , contraposition
   , have
+  , apply
   ) where
 
 import SetTheoryProver.Core
@@ -28,13 +29,13 @@ import Control.Monad.State.Strict hiding (state)
 abstract :: Env -> LC -> LC
 abstract env term = foldl (flip LCAbs) term env
 
-apply :: LC -> Env -> LC
-apply term env = foldr (\(v, _) t -> LCApp t (LCVar v)) term env
+applyToAsms :: LC -> Env -> LC
+applyToAsms term env = foldr (\(v, _) t -> LCApp t (LCVar v)) term env
 
 liftModusPonens :: Env -> Proof -> [Proof] -> Proof
 liftModusPonens asms fun args =
   let
-    app = foldl (\t arg -> t :@ apply (LCPrf arg) asms) (LCPrf fun) args
+    app = foldl (\t arg -> t :@ applyToAsms (LCPrf arg) asms) (LCPrf fun) args
   in
     translate (abstract asms app)
 
@@ -63,7 +64,7 @@ split = do
           phiProof:psiProof:otherProofs ->
             let phiAndPsiProof = liftModusPonens asms (and_intro phi psi) [phiProof, psiProof]
                   --translate $ abstract asms $
-                  --  ((LCPrf (and_intro phi psi) `LCApp` apply (LCPrf phiProof) asms) `LCApp` apply (LCPrf psiProof) asms)
+                  --  ((LCPrf (and_intro phi psi) `LCApp` applyToAsms (LCPrf phiProof) asms) `LCApp` applyToAsms (LCPrf psiProof) asms)
             in constructProof state (phiAndPsiProof:otherProofs)
           _ -> error "split: expected to get proofs for two subgoals (corresponding to the two conjuncts)"
     }
@@ -84,7 +85,7 @@ left = do
           [] -> error "left: expected to get proof of at least one subgoal (corresponding to the left disjunct)"
           phiProof:otherProofs ->
             let phiOrPsiProof = liftModusPonens asms (or_intro1 phi psi) [phiProof]
-                  --translate (abstract asms (LCPrf (or_intro1 phi psi) `LCApp` apply (LCPrf phiProof) asms))
+                  --translate (abstract asms (LCPrf (or_intro1 phi psi) `LCApp` applyToAsms (LCPrf phiProof) asms))
             in constructProof state (phiOrPsiProof:otherProofs)
     }
 
@@ -104,7 +105,7 @@ right = do
           [] -> error "right: expected to get proof of at least one subgoal (corresponding to the right disjunct)"
           psiProof:otherProofs ->
             let phiOrPsiProof = liftModusPonens asms (or_intro2 phi psi) [psiProof]
-                  --translate (abstract asms (LCPrf (or_intro2 phi psi) `LCApp` apply (LCPrf phiProof) asms))
+                  --translate (abstract asms (LCPrf (or_intro2 phi psi) `LCApp` applyToAsms (LCPrf phiProof) asms))
             in constructProof state (phiOrPsiProof:otherProofs)
     }
 
@@ -205,8 +206,8 @@ cases name = do
               subgoalProof =
                 translate $ abstract asms $
                   LCPrf (or_elim phi psi target)
-                    :@ (name ::: phi :-> apply (LCPrf subgoalProofWithPhi) asmsWithPhi)
-                    :@ (name ::: psi :-> apply (LCPrf subgoalProofWithPsi) asmsWithPsi)
+                    :@ (name ::: phi :-> applyToAsms (LCPrf subgoalProofWithPhi) asmsWithPhi)
+                    :@ (name ::: psi :-> applyToAsms (LCPrf subgoalProofWithPsi) asmsWithPsi)
                     :@ LCVar name
             in constructProof state (subgoalProof:otherProofs)
           _ -> error "cases: expected to get at least two proofs (for the claim, one assuming phi, one assuming psi)"
@@ -250,7 +251,7 @@ destruct asmName leftAsmName rightAsmName = do
             let
               subgoalProof =
                 translate $ abstract asms $
-                  apply (LCPrf subgoalProof') asms
+                  applyToAsms (LCPrf subgoalProof') asms
                     :@ (LCPrf (and_elim1 phi psi) :@ LCVar asmName)
                     :@ (LCPrf (and_elim2 phi psi) :@ LCVar asmName)
             in
@@ -274,7 +275,7 @@ contraposition = do
           [] -> error "contraposition: expected to get at least one proof"
           contrapositionProof:otherProofs ->
             let
-              implicationProof = translate (abstract asms (LCPrf (ax4 phi psi) :@ apply (LCPrf contrapositionProof) asms))
+              implicationProof = translate (abstract asms (LCPrf (ax4 phi psi) :@ applyToAsms (LCPrf contrapositionProof) asms))
             in
               constructProof state (implicationProof:otherProofs)
     }
@@ -299,12 +300,41 @@ have name formula = do
             let
               targetProof =
                 translate $ abstract asms $
-                  apply (LCPrf targetProofUsingFormula) asms :@ apply (LCPrf formulaProof) asms
+                  applyToAsms (LCPrf targetProofUsingFormula) asms :@ applyToAsms (LCPrf formulaProof) asms
             in
               constructProof state (targetProof:otherProofs)
           _ -> error "have: expected to get at least two proofs!"
     }
 
+apply :: String -> Tactic
+apply name = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
+      [] -> fail "apply: no goals"
+  (phi, psi) <-
+    case lookup name asms of
+      Nothing -> fail ("apply: '" ++ name ++ "' is not in scope!")
+      Just (phi :=>: psi) -> pure (phi, psi)
+      Just _ -> fail ("apply: assumption '" ++ name ++ "' is not an implication!")
+  when (psi /= target) $
+    fail ("apply: the current target does not match the consequent of assumption '" ++ name ++ "'")
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms, claim = phi } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "apply: expected at least one proof"
+          psiProof:otherProofs ->
+            let
+              phiProof = translate $ abstract asms $ LCVar name :@ applyToAsms (LCPrf psiProof) asms
+            in
+              constructProof state (phiProof:otherProofs)
+    }
+
+-- TODO: focusing tactic
+-- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
 -- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall

@@ -95,7 +95,7 @@ printSubgoal (Subgoal { assumptions = asms, claim = target }) = do
     colGap          = "  "
     formulaColWidth = foldl max 6 (map (length . show . snd) asms)
     totalWidth      = max (length (show target)) (nameColWidth + length colGap + formulaColWidth)
-  forM_ asms $ \(name, formula) -> do
+  forM_ (reverse asms) $ \(name, formula) -> do
     setSGR [SetColor Foreground Vivid Blue]
     putStr (padLeft nameColWidth name)
     setSGR [Reset]

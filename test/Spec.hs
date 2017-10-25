@@ -98,7 +98,25 @@ proofWithHave =
 -- TODO:
 --   phi :=>: Neg (Neg phi)
 --   phi :/\: (psi :\/: xi) :=>: (phi :/\: psi) :\/: (phi :/\: xi)
---   currying
+--   symmetry of =
+--   transitivity of =
+
+currying :: Test
+currying =
+  checkProof ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
+    split
+    -- =>
+    intros ["uncurriedFn", "phi", "psi"]
+    apply "uncurriedFn"
+    split
+    assumption "phi"
+    assumption "psi"
+    -- <=
+    intros ["curriedFn", "phiAndPsi"]
+    destruct "phiAndPsi" "phi" "psi"
+    have "psiImpliesXi" (psi :=>: xi) >> apply "curriedFn" >> assumption "phi"
+    apply "psiImpliesXi"
+    assumption "psi"
 
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
@@ -123,6 +141,7 @@ main = do
     , contradiction
     , andCommutative
     , proofWithHave
+    , currying
     , incompleteProof
     , wrongAssumptionName
     ]
