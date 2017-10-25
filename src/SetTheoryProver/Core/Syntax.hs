@@ -125,13 +125,19 @@ infixr 3 :/\:
 infixr 2 :\/:
 infixr 1 :=>:
 
-pattern (:=>:), (:\/:), (:/\:) :: Formula -> Formula -> Formula
+pattern (:=>:) :: Formula -> Formula -> Formula
 pattern f :=>: g = Implies f g
+
+pattern (:\/:) :: Formula -> Formula -> Formula
 pattern f :\/: g = Or f g
+
+pattern (:/\:) :: Formula -> Formula -> Formula
 pattern f :/\: g = And f g
 
-pattern (:=:), (:€:) :: Term -> Term -> Formula
+pattern (:=:) :: Term -> Term -> Formula
 pattern f :=: g = Eq f g
+
+pattern (:€:) :: Term -> Term -> Formula
 pattern x :€: y  = Elem x y
 
 -- TODO: make pattern synonym?
