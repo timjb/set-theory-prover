@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Syntax
+module SetTheoryProver.Core.Syntax
   ( VarName
   , Ctx
   , Term (..)
@@ -133,8 +133,6 @@ pattern f :/\: g = And f g
 pattern (:=:), (:€:) :: Term -> Term -> Formula
 pattern f :=: g = Eq f g
 pattern x :€: y  = Elem x y
-
--- TODO: nice pretty-printing
 
 -- TODO: make pattern synonym?
 iff :: Formula -> Formula -> Formula

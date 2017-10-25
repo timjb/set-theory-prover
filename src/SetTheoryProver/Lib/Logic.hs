@@ -1,13 +1,12 @@
-module Consequences
+module SetTheoryProver.Lib.Logic
   (
   -- * Consequences of the axioms
     ignoreFirstArg
   , compose
   ) where
 
-import Syntax
-import Axioms
-import LambdaEmbedding
+import SetTheoryProver.Core
+import SetTheoryProver.Interactive
 
 -- | Schema 'ψ ⇒ φ ⇒ φ'
 ignoreFirstArg :: Formula -> Formula -> Proof

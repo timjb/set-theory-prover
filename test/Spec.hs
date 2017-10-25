@@ -1,10 +1,9 @@
 module Main (main) where
 
-import Syntax
-import Axioms
-import Consequences
-import TacticMonad
-import Tactics
+import SetTheoryProver.Core
+import SetTheoryProver.Interactive.TacticMonad
+import SetTheoryProver.Interactive.Tactics
+import SetTheoryProver.Lib.Logic
 
 import Data.Either (isLeft)
 import Control.Monad (unless)

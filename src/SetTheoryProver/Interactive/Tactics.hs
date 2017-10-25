@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Tactics
+module SetTheoryProver.Interactive.Tactics
   ( split
   , left
   , right
@@ -15,10 +15,9 @@ module Tactics
   , contraposition
   ) where
 
-import Syntax
-import Axioms
-import TacticMonad
-import LambdaEmbedding
+import SetTheoryProver.Core
+import SetTheoryProver.Interactive.TacticMonad
+import SetTheoryProver.Interactive.LambdaEmbedding
 
 import Control.Monad (mapM_)
 import Control.Monad.Except (catchError)

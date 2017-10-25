@@ -1,4 +1,4 @@
-module Axioms
+module SetTheoryProver.Core.Axioms
   (
   -- * Proof data type
     Proof(getFormula)
@@ -41,7 +41,7 @@ module Axioms
   , choiceAxiom
   ) where
 
-import Syntax
+import SetTheoryProver.Core.Syntax
 
 newtype Proof = Proof { getFormula :: Formula }
 

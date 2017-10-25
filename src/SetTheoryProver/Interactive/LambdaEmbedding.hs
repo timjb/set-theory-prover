@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module LambdaEmbedding
+module SetTheoryProver.Interactive.LambdaEmbedding
   (
   -- * Translating lambda terms to proofs
     LC(..)
@@ -10,8 +10,7 @@ module LambdaEmbedding
   , translate
   ) where
 
-import Syntax
-import Axioms
+import SetTheoryProver.Core
 
 import Data.Maybe (fromMaybe)
 

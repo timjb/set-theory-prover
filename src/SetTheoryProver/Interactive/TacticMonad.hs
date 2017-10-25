@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module TacticMonad
+module SetTheoryProver.Interactive.TacticMonad
   ( Env
   , Subgoal(..)
   , ProofState(..)
@@ -11,11 +11,11 @@ module TacticMonad
   , prove
   ) where
 
+import SetTheoryProver.Core.Syntax
+import SetTheoryProver.Core.Axioms (Proof(..))
+
 import Control.Monad.State.Strict
 import Control.Monad.Except
-
-import Syntax
-import Axioms (Proof(..))
 
 type Env = [(String, Formula)]
 

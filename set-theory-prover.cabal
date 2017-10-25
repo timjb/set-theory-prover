@@ -17,12 +17,14 @@ library
   ghc-options:         -Wall -Werror
   hs-source-dirs:      src
   exposed-modules:
-    Syntax
-    Axioms
-    LambdaEmbedding
-    Consequences
-    TacticMonad
-    Tactics
+    SetTheoryProver.Core
+    SetTheoryProver.Core.Syntax
+    SetTheoryProver.Core.Axioms
+    SetTheoryProver.Interactive
+    SetTheoryProver.Interactive.LambdaEmbedding
+    SetTheoryProver.Interactive.TacticMonad
+    SetTheoryProver.Interactive.Tactics
+    SetTheoryProver.Lib.Logic
   build-depends:
     base >= 4.7 && < 5,
     mtl
