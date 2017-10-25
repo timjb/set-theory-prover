@@ -1,14 +1,15 @@
 {-# LANGUAGE LambdaCase #-}
 
 module SetTheoryProver.Interactive.Tactics
-  ( split
+  ( logMsg
+  , try
+  , split
   , left
   , right
   , intro
   , intros
   , assumption
   , exact
-  , try
   , refl
   , cases
   , destruct
@@ -36,6 +37,15 @@ liftModusPonens asms fun args =
   in
     translate (abstract asms app)
 
+logMsg :: String -> Tactic
+logMsg msg = modify $ \state -> state { proofLog = msg : proofLog state }
+
+try :: TacticM a -> TacticM (Maybe a)
+try script =
+  catchError (Just <$> script) $ \exc -> do
+    logMsg ("tried tactic failed with msg: " ++ errorMsg exc)
+    pure Nothing
+
 split :: Tactic
 split = do
   state <- get
@@ -45,7 +55,7 @@ split = do
       Subgoal { assumptions = asms, claim = phi :/\: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "split: first goal is not of the form 'phi :/\\: psi'"
   put $
-    ProofState
+    state
     { currentGoals = Subgoal { assumptions = asms, claim = phi } : Subgoal { assumptions = asms, claim = psi } : otherGoals
     , constructProof =
         \case
@@ -66,7 +76,7 @@ left = do
       Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "left: first goal is not of the form 'phi :\\/: psi'"
   put $
-    ProofState
+    state
     { currentGoals = Subgoal { assumptions = asms, claim = phi } : otherGoals
     , constructProof =
         \case
@@ -86,7 +96,7 @@ right = do
       Subgoal { assumptions = asms, claim = phi :\/: psi } : otherGoals -> pure (asms, phi, psi, otherGoals)
       _:_ -> fail "right: first goal is not of the form 'phi :\\/: psi'"
   put $
-    ProofState
+    state
     { currentGoals = Subgoal { assumptions = asms, claim = psi } : otherGoals
     , constructProof =
         \case
@@ -128,7 +138,7 @@ assumption name = do
       when (formula /= formula') $
         fail ("assumption '" ++ name ++ "' doesn't prove the current goal!")
   put $
-    ProofState
+    state
     { currentGoals = otherGoals
     , constructProof =
         \subproofs ->
@@ -146,16 +156,10 @@ exact proof = do
   when (formula /= getFormula proof) $
     fail "exact: purported proof doesn't prove the first subgoal"
   put $
-    ProofState
+    state
     { currentGoals = otherGoals
     , constructProof = \subproofs -> constructProof state (proof:subproofs)
     }
-
-try :: TacticM a -> TacticM (Maybe a)
-try script =
-  catchError (Just <$> script) $ \_exc ->
-    -- TODO: log exception
-    pure Nothing
 
 refl :: Tactic
 refl = do
@@ -167,7 +171,7 @@ refl = do
         fail "refl: terms not equal!"
       let reflProof = translate (abstract asms (LCPrf (ax8 s)))
       put $
-        ProofState
+        state
         { currentGoals = otherGoals
         , constructProof = \subproofs -> constructProof state (reflProof:subproofs)
         }
@@ -191,7 +195,7 @@ cases name = do
     subgoalWithPhi = Subgoal { assumptions = asmsWithPhi, claim = target }
     subgoalWithPsi = Subgoal { assumptions = asmsWithPsi, claim = target }
   put $
-    ProofState
+    state
     { currentGoals = subgoalWithPhi : subgoalWithPsi : otherSubgoals
     , constructProof =
         \case
@@ -236,7 +240,7 @@ destruct asmName leftAsmName rightAsmName = do
   let
     asms' = (rightAsmName, psi) : (leftAsmName, phi) : asms
   put $
-    ProofState
+    state
     { currentGoals = Subgoal { assumptions = asms', claim = target } : otherSubgoals
     , constructProof =
         \case
@@ -262,7 +266,7 @@ contraposition = do
         pure (asms, phi, psi, otherSubgoals)
       _:_ -> fail "contraposition: goal is not of the form 'phi :=>: psi'"
   put $
-    ProofState
+    state
     { currentGoals = Subgoal { assumptions = asms, claim = Neg psi :=>: Neg phi } : otherSubgoals
     , constructProof =
         \case

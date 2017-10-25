@@ -29,6 +29,7 @@ data ProofState
   = ProofState
   { currentGoals :: [Subgoal] -- ^ current subgoals
   , constructProof :: [Proof] -> Proof -- ^ given proofs for the subgoals, construct a proof for the overall goal
+  , proofLog :: [String] -- ^ log messages
   }
 
 newtype TacticException
@@ -57,6 +58,7 @@ initialProofState goal =
         case ps of
           []  -> error "initialProofState: expected to get at least one proof"
           p:_ -> p
+  , proofLog = []
   }
 
 extractProof :: ProofState -> Except TacticException Proof
