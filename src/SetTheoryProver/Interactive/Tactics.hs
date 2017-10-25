@@ -14,6 +14,7 @@ module SetTheoryProver.Interactive.Tactics
   , cases
   , destruct
   , contraposition
+  , have
   ) where
 
 import SetTheoryProver.Core
@@ -278,10 +279,35 @@ contraposition = do
               constructProof state (implicationProof:otherProofs)
     }
 
+have :: String -> Formula -> Tactic
+have name formula = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
+      [] -> fail "have: no goals"
+  when (name `elem` map fst asms) $
+    fail ("have: name '" ++ name ++ "' already in scope!")
+  let
+    asms' = (name, formula) : asms
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms, claim = formula } : Subgoal { assumptions = asms', claim = target } : otherSubgoals
+    , constructProof =
+        \case
+          formulaProof:targetProofUsingFormula:otherProofs ->
+            let
+              targetProof =
+                translate $ abstract asms $
+                  apply (LCPrf targetProofUsingFormula) asms :@ apply (LCPrf formulaProof) asms
+            in
+              constructProof state (targetProof:otherProofs)
+          _ -> error "have: expected to get at least two proofs!"
+    }
+
 -- TODO: rewrite tactic
 -- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
--- TODO: tactic for introducing local lemmas
 -- TODO: ex falso tactic

@@ -86,9 +86,19 @@ andCommutative =
     assumption "hr"
     assumption "hl"
 
+proofWithHave :: Test
+proofWithHave =
+  checkProof (phi :=>: (phi :\/: psi) :/\: (phi :\/: psi)) $ do
+    intro "phi"
+    have "phiOrPsi" (phi :\/: psi) >> left >> assumption "phi"
+    split
+    assumption "phiOrPsi"
+    assumption "phiOrPsi"
+
 -- TODO:
 --   phi :=>: Neg (Neg phi)
 --   phi :/\: (psi :\/: xi) :=>: (phi :/\: psi) :\/: (phi :/\: xi)
+--   currying
 
 incompleteProof :: Test
 incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
@@ -112,6 +122,7 @@ main = do
     , orCommutative
     , contradiction
     , andCommutative
+    , proofWithHave
     , incompleteProof
     , wrongAssumptionName
     ]
