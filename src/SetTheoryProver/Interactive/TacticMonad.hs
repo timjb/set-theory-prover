@@ -14,6 +14,7 @@ module SetTheoryProver.Interactive.TacticMonad
 
 import SetTheoryProver.Core.Syntax
 import SetTheoryProver.Core.Axioms (Proof(..))
+import SetTheoryProver.Interactive.LambdaEmbedding
 
 import Control.Monad.State.Strict
 import Control.Monad.Except
@@ -31,7 +32,7 @@ data Subgoal
 data ProofState
   = ProofState
   { currentGoals :: [Subgoal] -- ^ current subgoals
-  , constructProof :: [Proof] -> Proof -- ^ given proofs for the subgoals, construct a proof for the overall goal
+  , constructProof :: [LC] -> LC -- ^ given proofs for the subgoals, construct a proof for the overall goal
   , proofLog :: [String] -- ^ log messages
   }
 
@@ -67,7 +68,7 @@ initialProofState goal =
 extractProof :: ProofState -> Except TacticException Proof
 extractProof (ProofState { currentGoals = currGoals, constructProof = constrPrf }) =
   case currGoals of
-    [] -> pure (constrPrf [])
+    [] -> pure (translate (constrPrf []))
     _  -> throwError (TacticException "to extract a proof, there mustn't be open subgoals")
 
 prove' :: Formula -> TacticM a -> Either TacticException Proof
@@ -122,7 +123,7 @@ interactive goal script = do
       case currentGoals proofState of
         [] -> do
           let
-            proof = constructProof proofState []
+            proof = translate (constructProof proofState [])
           unless (getFormula proof == goal) $
             outputErrorMsg $ unlines
               [ "Proved statement differs from goal! Proof shows that"
