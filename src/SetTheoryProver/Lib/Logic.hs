@@ -11,6 +11,8 @@ module SetTheoryProver.Lib.Logic
   , negNegElimination
   , negNegIntroduction
   , negCharacterisation
+  , contrapositionConverse
+  , exFalso
   ) where
 
 import SetTheoryProver.Core
@@ -119,4 +121,32 @@ negCharacterisation phi =
     apply "negNegPhiImpliesPhi"
     assumption "negNegPhi"
     apply "truthImpliesNegPhi"
+    exact truthIsTrue
+
+-- | Schema '(φ ⇒ ψ) ⇒ ¬ψ ⇒ ¬φ'
+--
+-- >>> checkProof (contrapositionConverse phi psi)
+contrapositionConverse :: Formula -> Formula -> Proof
+contrapositionConverse phi psi =
+  prove ((phi :=>: psi) :=>: Neg psi :=>: Neg phi) $ do
+    intro "phiImpliesPsi"
+    contraposition
+    intro "negNegPhi"
+    have "psiImpliesNegNegPsi" (psi :=>: Neg (Neg psi)) >> exact (negNegIntroduction psi)
+    have "negNegPhiImpliesPhi" (Neg (Neg phi) :=>: phi) >> exact (negNegElimination phi)
+    apply "psiImpliesNegNegPsi"
+    apply "phiImpliesPsi"
+    apply "negNegPhiImpliesPhi"
+    assumption "negNegPhi"
+
+-- | Schema '⊥ ⇒ φ'
+--
+-- >>> checkProof (exFalso phi)
+exFalso :: Formula -> Proof
+exFalso phi =
+  prove (falsity :=>: phi) $ do
+    contraposition
+    intro "_"
+    have "truthImpliesNegFalsity" (truth :=>: Neg falsity) >> exact (negNegIntroduction truth)
+    apply "truthImpliesNegFalsity"
     exact truthIsTrue
