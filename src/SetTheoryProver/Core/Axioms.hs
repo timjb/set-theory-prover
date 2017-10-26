@@ -2,6 +2,8 @@ module SetTheoryProver.Core.Axioms
   (
   -- * Proof data type
     Proof(getFormula)
+  , checkProof
+  , checkProofOf
   -- * Proof Rules
   , mp
   , generalise
@@ -43,7 +45,20 @@ module SetTheoryProver.Core.Axioms
 
 import SetTheoryProver.Core.Syntax
 
+import Control.Monad (when)
+
+import Control.DeepSeq
+
 newtype Proof = Proof { getFormula :: Formula }
+
+checkProof :: Proof -> IO ()
+checkProof (Proof p) =
+  p `deepseq` pure ()
+
+checkProofOf :: Formula -> Proof -> IO ()
+checkProofOf goal (Proof p) =
+  when (goal /= p) $
+    fail "checkProof: goal does not match proofed statement!"
 
 -- | Modus Ponens
 mp :: Proof -> Proof -> Proof

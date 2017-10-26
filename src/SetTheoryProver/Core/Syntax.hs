@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module SetTheoryProver.Core.Syntax
@@ -36,6 +38,8 @@ module SetTheoryProver.Core.Syntax
   ) where
 
 import Data.String (IsString(..))
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 type VarName = String
 type Ctx = [VarName]
@@ -47,7 +51,7 @@ varUnion xs ys = xs ++ filter (`notElem` xs) ys
 data Term
   = Var VarName
   | DefDescr VarName Formula -- ^ definite descriptor
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
 
 instance IsString Term where
   fromString = Var
@@ -87,7 +91,7 @@ data Formula
   | Exists VarName Formula -- ^ existential quantification
   -- Set-theory
   | Elem Term Term -- ^ Element relation
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
 
 instance Show Formula where
   showsPrec ctxPrec formula =
