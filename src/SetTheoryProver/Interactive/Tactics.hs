@@ -151,16 +151,18 @@ assumption name = do
 exact :: Proof -> Tactic
 exact proof = do
   state <- get
-  (formula, otherGoals) <-
+  (Subgoal { assumptions = asms, claim = formula }, otherGoals) <-
     case currentGoals state of
       [] -> fail "exact: no goals"
-      Subgoal { claim = formula } : otherGoals -> pure (formula, otherGoals)
+      subgoal : otherGoals -> pure (subgoal, otherGoals)
   when (formula /= getFormula proof) $
     fail "exact: purported proof doesn't prove the first subgoal"
+  let subgoalProof = translate (abstract asms (LCPrf proof))
   put $
     state
     { currentGoals = otherGoals
-    , constructProof = \subproofs -> constructProof state (proof:subproofs)
+    , constructProof =
+        \subproofs -> constructProof state (subgoalProof:subproofs)
     }
 
 refl :: Tactic
@@ -341,3 +343,4 @@ apply name = do
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: ex falso tactic
+-- TODO: clear tactic
