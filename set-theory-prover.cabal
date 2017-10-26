@@ -20,6 +20,7 @@ library
     SetTheoryProver.Core
     SetTheoryProver.Core.Syntax
     SetTheoryProver.Core.Axioms
+    SetTheoryProver.Core.ProofScript
     SetTheoryProver.Interactive
     SetTheoryProver.Interactive.LambdaEmbedding
     SetTheoryProver.Interactive.TacticMonad
