@@ -3,7 +3,6 @@ module Main (main) where
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive.TacticMonad
 import SetTheoryProver.Interactive.Tactics
-import SetTheoryProver.Lib.Logic
 
 import Data.Either (isLeft)
 import Control.Monad (unless)
@@ -11,8 +10,8 @@ import System.Exit (exitFailure)
 
 type Test = IO Bool
 
-checkProof :: Formula -> Tactic -> Test
-checkProof formula script =
+checkTacticProof :: Formula -> Tactic -> Test
+checkTacticProof formula script =
   case prove' formula script of
     Left exc -> do
       putStrLn ("✘ Proof script for '" ++ show formula ++ "' failed: '" ++ errorMsg exc ++ "'.")
@@ -21,8 +20,8 @@ checkProof formula script =
       putStrLn ("✓ Checked proof of '" ++ show formula ++ "'.")
       pure True
 
-checkNoProof :: String -> Formula -> Tactic -> Test
-checkNoProof reason formula script =
+checkNoTacticProof :: String -> Formula -> Tactic -> Test
+checkNoTacticProof reason formula script =
   case prove' formula script of
     Left err -> do
       putStrLn ("✓ Tactic script failed, as it should, since " ++ reason ++ ".")
@@ -40,14 +39,14 @@ xi  = Var "z" :€: Var "s"
 
 tacticProof :: Test
 tacticProof =
-  checkProof (psi :=>: phi :=>: psi :\/: phi) $ do
+  checkTacticProof (psi :=>: phi :=>: psi :\/: phi) $ do
     intros ["h1", "h2"]
     left
     assumption "h1"
 
 trySkipsErrors :: Test
 trySkipsErrors =
-  checkProof (phi :=>: phi) $ do
+  checkTacticProof (phi :=>: phi) $ do
     intro "h1"
     res <- try left -- 'left' tactic is not applicable, since goal is not a disjunction
     case res of
@@ -57,29 +56,28 @@ trySkipsErrors =
 
 reflProof :: Test
 reflProof =
-  checkProof (phi :=>: Var "x" :=: Var "x") $ do
+  checkTacticProof (phi :=>: Var "x" :=: Var "x") $ do
     intro "h"
     refl
 
 orCommutative :: Test
 orCommutative =
-  checkProof (phi :\/: psi :=>: psi :\/: phi) $ do
+  checkTacticProof (phi :\/: psi :=>: psi :\/: phi) $ do
     intro "h"
     cases "h"
     right; assumption "h"
     left; assumption "h"
 
-contradiction :: Test
-contradiction =
-  checkProof (Neg phi :=>: phi :=>: falsity) $ do
-    intro "notPhi"
+proofWithContraposition :: Test
+proofWithContraposition =
+  checkTacticProof ((Neg phi :=>: Neg psi) :=>: psi :=>: phi) $ do
+    intro "negPhiImpliesNegPsi"
     contraposition
-    intro "_"
-    assumption "notPhi"
+    assumption "negPhiImpliesNegPsi"
 
 andCommutative :: Test
 andCommutative =
-  checkProof (phi :/\: psi :=>: psi :/\: phi) $ do
+  checkTacticProof (phi :/\: psi :=>: psi :/\: phi) $ do
     intro "h"
     destruct "h" "hl" "hr"
     split
@@ -88,7 +86,7 @@ andCommutative =
 
 proofWithHave :: Test
 proofWithHave =
-  checkProof (phi :=>: (phi :\/: psi) :/\: (phi :\/: psi)) $ do
+  checkTacticProof (phi :=>: (phi :\/: psi) :/\: (phi :\/: psi)) $ do
     intro "phi"
     have "phiOrPsi" (phi :\/: psi) >> left >> assumption "phi"
     split
@@ -103,7 +101,7 @@ proofWithHave =
 
 currying :: Test
 currying =
-  checkProof ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
+  checkTacticProof ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
     split
     -- =>
     intros ["uncurriedFn", "phi", "psi"]
@@ -119,26 +117,23 @@ currying =
     assumption "psi"
 
 incompleteProof :: Test
-incompleteProof = checkNoProof "there are open subgoals" truth (pure ())
+incompleteProof = checkNoTacticProof "there are open subgoals" truth (pure ())
 
 wrongAssumptionName :: Test
 wrongAssumptionName =
-  checkNoProof "there is no assumption named \"g\" in scope" (psi :=>: psi) $ do
+  checkNoTacticProof "there is no assumption named \"g\" in scope" (psi :=>: psi) $ do
     intro "h"
     assumption "g"
 
 main :: IO ()
 main = do
   results <- sequence
-    [ checkProof (phi :=>: phi) (exact (ax1 phi))
-    , checkProof (phi :=>: (psi :=>: psi)) (exact (ignoreFirstArg psi phi))
-    , checkProof ((psi :=>: xi) :=>: (phi :=>: psi) :=>: (phi :=>: xi)) (exact (compose phi psi xi))
-    , tacticProof
-    , checkProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
+    [ tacticProof
+    , checkTacticProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
     , trySkipsErrors
     , reflProof
     , orCommutative
-    , contradiction
+    , proofWithContraposition
     , andCommutative
     , proofWithHave
     , currying
