@@ -37,9 +37,9 @@ module SetTheoryProver.Core.Syntax
   , pairSet
   ) where
 
+import Control.DeepSeq (NFData)
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 type VarName = String
 type Ctx = [VarName]

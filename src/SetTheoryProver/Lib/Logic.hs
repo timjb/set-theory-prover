@@ -28,7 +28,7 @@ import SetTheoryProver.Interactive
 -- >>> checkProofOf (psi :=>: phi :=>: phi) (ignoreFirstArg phi psi)
 ignoreFirstArg :: Formula -> Formula -> Proof
 ignoreFirstArg phi psi =
-  translate ("x" ::: psi :-> "y" ::: phi :-> LCVar "y")
+  translate ("x" ::: psi :-> "y" ::: phi :-> "y")
   --let
   --  step1 = ax2 (phi `Implies` phi) psi -- (φ ⇒ φ) ⇒ ψ ⇒ φ ⇒ φ
   --  step2 = ax1 phi                     -- φ ⇒ φ
@@ -45,7 +45,7 @@ compose phi psi xi =
     "f" ::: (psi :=>: xi) :->
       "g" ::: (phi :=>: psi) :->
         "x" ::: phi :->
-          LCVar "f" :@ (LCVar "g" :@ LCVar "x")
+          "f" :@ ("g" :@ "x")
 
 -- | Proof of 'truth'
 --
@@ -62,7 +62,7 @@ flipAssumptions phi psi xi =
     "f" ::: (phi :=>: psi :=>: xi) :->
       "psi" ::: psi :->
         "phi" ::: phi :->
-          LCVar "f" :@ LCVar "phi" :@ LCVar "psi"
+          "f" :@ "phi" :@ "psi"
 
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --
@@ -82,14 +82,11 @@ negNegElimination :: Formula -> Proof
 negNegElimination phi =
   prove (Neg (Neg phi) :=>: phi) $ do
     intro "negNegPhi"
-    have "contradiction" (Neg (Neg phi) :=>: Neg phi :=>: falsity)
-    exact (contradiction (Neg phi))
     have "truthImpliesPhi" (truth :=>: phi)
     contraposition
-    apply "contradiction"
+    applyProof (contradiction (Neg phi))
     assumption "negNegPhi"
-    apply "truthImpliesPhi"
-    exact truthIsTrue
+    exact ("truthImpliesPhi" :@ LCPrf truthIsTrue)
 
 -- | Schema 'φ ⇒ ¬¬φ'
 --
@@ -99,7 +96,6 @@ negNegIntroduction phi =
   prove (phi :=>: Neg (Neg phi)) $ do
     contraposition
     exact (negNegElimination (Neg phi))
-
 
 -- | Schema '¬φ ⇔ (φ ⇒ ⊥)'
 --
@@ -116,12 +112,9 @@ negCharacterisation phi =
     contraposition
     intro "negNegPhi"
     apply "notPhi'"
-    have "negNegPhiImpliesPhi" (Neg (Neg phi) :=>: phi)
-    exact (negNegElimination phi)
-    apply "negNegPhiImpliesPhi"
+    applyProof (negNegElimination phi)
     assumption "negNegPhi"
-    apply "truthImpliesNegPhi"
-    exact truthIsTrue
+    exact ("truthImpliesNegPhi" :@ LCPrf truthIsTrue)
 
 -- | Schema '(φ ⇒ ψ) ⇒ ¬ψ ⇒ ¬φ'
 --
@@ -132,11 +125,9 @@ contrapositionConverse phi psi =
     intro "phiImpliesPsi"
     contraposition
     intro "negNegPhi"
-    have "psiImpliesNegNegPsi" (psi :=>: Neg (Neg psi)) >> exact (negNegIntroduction psi)
-    have "negNegPhiImpliesPhi" (Neg (Neg phi) :=>: phi) >> exact (negNegElimination phi)
-    apply "psiImpliesNegNegPsi"
+    applyProof (negNegIntroduction psi)
     apply "phiImpliesPsi"
-    apply "negNegPhiImpliesPhi"
+    applyProof (negNegElimination phi)
     assumption "negNegPhi"
 
 -- | Schema '⊥ ⇒ φ'
@@ -147,6 +138,5 @@ exFalso phi =
   prove (falsity :=>: phi) $ do
     contraposition
     intro "_"
-    have "truthImpliesNegFalsity" (truth :=>: Neg falsity) >> exact (negNegIntroduction truth)
-    apply "truthImpliesNegFalsity"
+    applyProof (negNegIntroduction truth)
     exact truthIsTrue

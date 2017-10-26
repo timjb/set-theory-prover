@@ -3,27 +3,40 @@
 module SetTheoryProver.Interactive.LambdaEmbedding
   (
   -- * Translating lambda terms to proofs
-    LC(..)
+    LC(.., (:->), (:@))
   , pattern (:::)
-  , pattern (:->)
-  , pattern (:@)
+  , ToLC(..)
+  , inferType
   , translate
   ) where
 
 import SetTheoryProver.Core
 
+import Control.Monad (when)
 import Data.Maybe (fromMaybe)
+import Data.String (IsString(..))
 
 data LC
   = LCAbs (VarName, Formula) LC -- ^ lambda abstraction
-  | LCApp LC LC              -- ^ application
-  | LCVar VarName            -- ^ variable
-  | LCPrf Proof              -- ^ proof
-
+  | LCApp LC LC                 -- ^ application
+  | LCVar VarName               -- ^ variable
+  | LCPrf Proof                 -- ^ proof
 
 infix 8 :::
 infixl 4 :@
 infixr 1 :->
+
+instance IsString LC where
+  fromString = LCVar
+
+class ToLC a where
+  toLC :: a -> LC
+
+instance ToLC LC where
+  toLC = id
+
+instance ToLC Proof where
+  toLC = LCPrf
 
 pattern (:::) :: VarName -> Formula -> (VarName, Formula)
 pattern x ::: y = (x, y)
@@ -41,6 +54,27 @@ freeVariables t =
     LCApp u v   -> freeVariables u `varUnion` freeVariables v
     LCVar x     -> [x]
     LCPrf _     -> []
+
+inferType :: [(VarName, Formula)] -> LC -> Either String Formula
+inferType env t =
+  case t of
+    LCAbs arg@(_, formula) body ->
+      (formula :=>:) <$> inferType (arg:env) body
+    LCApp u v -> do
+      uType <- inferType env u
+      vType <- inferType env v
+      case uType of
+        phi :=>: psi -> do
+          when (phi /= vType) $
+            Left "type of applicant doesn't match the antecedent of the implication"
+          pure psi
+        _ -> Left "the first argument of an application must be of the form 'phi :=>: psi'"
+    LCVar x ->
+      case lookup x env of
+        Nothing -> Left ("'" ++ x ++ "' is not in environment!")
+        Just formula -> Right formula
+    LCPrf p ->
+      Right (getFormula p)
 
 translate :: LC -> Proof
 translate lambdaTerm = extract (fst (go [] lambdaTerm))

@@ -16,6 +16,7 @@ module SetTheoryProver.Interactive.Tactics
   , contraposition
   , have
   , apply
+  , applyProof
   ) where
 
 import SetTheoryProver.Core
@@ -119,38 +120,36 @@ intros = mapM_ intro
 assumption :: String -> Tactic
 assumption name = do
   state <- get
-  (asms, formula, otherGoals) <-
+  (asms, formula) <-
     case currentGoals state of
       [] -> fail "assumption: no goals"
-      Subgoal { assumptions = asms, claim = formula } : otherGoals -> pure (asms, formula, otherGoals)
+      Subgoal { assumptions = asms, claim = formula } : _ -> pure (asms, formula)
   case lookup name asms of
     Nothing -> fail ("assumption: '" ++ name ++ "' is not an assumption!")
     Just formula' ->
       when (formula /= formula') $
         fail ("assumption '" ++ name ++ "' doesn't prove the current goal!")
-  put $
-    state
-    { currentGoals = otherGoals
-    , constructProof =
-        \subproofs ->
-          let proof = LCVar name
-          in constructProof state (proof:subproofs)
-    }
+  exact (LCVar name)
 
-exact :: Proof -> Tactic
-exact proof = do
+exact :: ToLC a => a -> Tactic
+exact proofLike = do
   state <- get
-  (Subgoal { claim = formula }, otherGoals) <-
+  (Subgoal { assumptions = asms, claim = formula }, otherGoals) <-
     case currentGoals state of
       [] -> fail "exact: no goals"
       subgoal : otherGoals -> pure (subgoal, otherGoals)
-  when (formula /= getFormula proof) $
-    fail "exact: purported proof doesn't prove the first subgoal"
+  let lambdaTerm = toLC proofLike
+  proofedFormula <-
+    case inferType asms lambdaTerm of
+      Left err -> fail ("exact: failed to infer type of given term. Reason: '" ++ err ++ "'")
+      Right inferred -> pure inferred
+  when (formula /= proofedFormula) $
+    fail ("exact: term does not prove the first subgoal, instead it proves '" ++ show proofedFormula ++ "'")
   put $
     state
     { currentGoals = otherGoals
     , constructProof =
-        \subproofs -> constructProof state (LCPrf proof : subproofs)
+        \subproofs -> constructProof state (lambdaTerm : subproofs)
     }
 
 refl :: Tactic
@@ -290,20 +289,20 @@ have name formula = do
           _ -> error "have: expected to get at least two proofs!"
     }
 
-apply :: String -> Tactic
-apply name = do
+apply :: LC -> Tactic
+apply lambdaTerm = do
   state <- get
   (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
     case currentGoals state of
       subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
       [] -> fail "apply: no goals"
   (phi, psi) <-
-    case lookup name asms of
-      Nothing -> fail ("apply: '" ++ name ++ "' is not in scope!")
-      Just (phi :=>: psi) -> pure (phi, psi)
-      Just _ -> fail ("apply: assumption '" ++ name ++ "' is not an implication!")
+    case inferType asms lambdaTerm of
+      Left err -> fail ("apply: inferring the type of the given type failed with message '" ++ err ++ "'")
+      Right (phi :=>: psi) -> pure (phi, psi)
+      Right _ -> fail ("apply: given term does not prove an implication!")
   when (psi /= target) $
-    fail ("apply: the current target does not match the consequent of assumption '" ++ name ++ "'")
+    fail ("apply: the current target does not match the consequent of the given term, which is '" ++ show psi ++ "'")
   put $
     state
     { currentGoals = Subgoal { assumptions = asms, claim = phi } : otherSubgoals
@@ -311,18 +310,19 @@ apply name = do
         \case
           [] -> error "apply: expected at least one proof"
           psiProof:otherProofs ->
-            let
-              phiProof = LCVar name :@ psiProof
-            in
-              constructProof state (phiProof:otherProofs)
+            let phiProof = lambdaTerm :@ psiProof
+            in constructProof state (phiProof:otherProofs)
     }
+
+applyProof :: Proof -> Tactic
+applyProof proof = apply (LCPrf proof)
 
 -- TODO: focusing tactic
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
--- TODO: tactic for lifting lambda terms
 -- TODO: tactic for instantiation of forall
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: ex falso tactic
 -- TODO: clear tactic
+-- TODO: auto tactic
