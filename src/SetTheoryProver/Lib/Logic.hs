@@ -82,10 +82,10 @@ negNegElimination :: Formula -> Proof
 negNegElimination phi =
   prove (Neg (Neg phi) :=>: phi) $ do
     intro "negNegPhi"
-    have "truthImpliesPhi" (truth :=>: phi)
-    contraposition
-    applyProof (contradiction (Neg phi))
-    assumption "negNegPhi"
+    have "truthImpliesPhi" (truth :=>: phi) by $ do
+      contraposition
+      applyProof (contradiction (Neg phi))
+      assumption "negNegPhi"
     exact ("truthImpliesPhi" :@ LCPrf truthIsTrue)
 
 -- | Schema 'φ ⇒ ¬¬φ'
@@ -108,12 +108,12 @@ negCharacterisation phi =
     exact (contradiction phi)
     -- <=
     intro "notPhi'"
-    have "truthImpliesNegPhi" (truth :=>: Neg phi)
-    contraposition
-    intro "negNegPhi"
-    apply "notPhi'"
-    applyProof (negNegElimination phi)
-    assumption "negNegPhi"
+    have "truthImpliesNegPhi" (truth :=>: Neg phi) by $ do
+      contraposition
+      intro "negNegPhi"
+      apply "notPhi'"
+      applyProof (negNegElimination phi)
+      assumption "negNegPhi"
     exact ("truthImpliesNegPhi" :@ LCPrf truthIsTrue)
 
 -- | Schema '(φ ⇒ ψ) ⇒ ¬ψ ⇒ ¬φ'

@@ -14,9 +14,11 @@ module SetTheoryProver.Interactive.Tactics
   , cases
   , destruct
   , contraposition
-  , have
+  , introAssumption
+  , have, by
   , apply
   , applyProof
+  , focus
   ) where
 
 import SetTheoryProver.Core
@@ -267,8 +269,8 @@ contraposition = do
               constructProof state (implicationProof:otherProofs)
     }
 
-have :: String -> Formula -> Tactic
-have name formula = do
+introAssumption :: String -> Formula -> Tactic
+introAssumption name formula = do
   state <- get
   (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
     case currentGoals state of
@@ -288,6 +290,14 @@ have name formula = do
             in constructProof state (targetProof:otherProofs)
           _ -> error "have: expected to get at least two proofs!"
     }
+
+have :: String -> Formula -> () -> Tactic -> Tactic
+have name formula () script = do
+  introAssumption name formula
+  focus script
+
+by :: ()
+by = ()
 
 apply :: LC -> Tactic
 apply lambdaTerm = do
@@ -317,7 +327,22 @@ apply lambdaTerm = do
 applyProof :: Proof -> Tactic
 applyProof proof = apply (LCPrf proof)
 
--- TODO: focusing tactic
+-- | Hides all other subgoals
+focus :: TacticM a -> TacticM a
+focus script = do
+  state <- get
+  (subgoal, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "focus: expected one open subgoal"
+      subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
+  put $ state { currentGoals = [subgoal] }
+  res <- script
+  state' <- get
+  put $ state' { currentGoals = currentGoals state' ++ otherSubgoals }
+  unless (null (currentGoals state')) $
+    logMsg ("focus: tactic did not fully solve subgoal '" ++ show (claim subgoal) ++ "'")
+  pure res
+
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
 -- TODO: tactic for instantiation of forall
@@ -326,3 +351,4 @@ applyProof proof = apply (LCPrf proof)
 -- TODO: ex falso tactic
 -- TODO: clear tactic
 -- TODO: auto tactic
+-- TODO: admit tactic

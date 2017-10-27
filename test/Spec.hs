@@ -90,7 +90,9 @@ proofWithHave :: Test
 proofWithHave =
   checkTacticProof (phi :=>: (phi :\/: psi) :/\: (phi :\/: psi)) $ do
     intro "phi"
-    have "phiOrPsi" (phi :\/: psi) >> left >> assumption "phi"
+    have "phiOrPsi" (phi :\/: psi) by $ do
+      left
+      assumption "phi"
     split
     assumption "phiOrPsi"
     assumption "phiOrPsi"
@@ -114,7 +116,9 @@ currying =
     -- <=
     intros ["curriedFn", "phiAndPsi"]
     destruct "phiAndPsi" "phi" "psi"
-    have "psiImpliesXi" (psi :=>: xi) >> apply "curriedFn" >> assumption "phi"
+    have "psiImpliesXi" (psi :=>: xi) by $ do
+      apply "curriedFn"
+      assumption "phi"
     apply "psiImpliesXi"
     assumption "psi"
 
