@@ -140,3 +140,8 @@ exFalso phi =
     intro "_"
     applyProof (negNegIntroduction truth)
     exact truthIsTrue
+
+-- TODO: LEM
+-- TODO: De Morgan Laws
+-- TODO: commutativity, associativity of :\/: and :/\:
+-- TODO: distributivity of :/\: and :\/:
