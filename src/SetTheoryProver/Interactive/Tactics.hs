@@ -3,6 +3,11 @@
 module SetTheoryProver.Interactive.Tactics
   ( logMsg
   , try
+  , repeat
+  , repeat_
+  , getSubgoals
+  , getSubgoal
+  , getAssumptions
   , split
   , left
   , right
@@ -21,11 +26,13 @@ module SetTheoryProver.Interactive.Tactics
   , focus
   ) where
 
+import Prelude hiding (repeat)
+
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive.TacticMonad
 import SetTheoryProver.Interactive.LambdaEmbedding
 
-import Control.Monad (mapM_)
+import Control.Monad (mapM_, void)
 import Control.Monad.Except (catchError)
 import Control.Monad.State.Strict hiding (state)
 
@@ -37,6 +44,35 @@ try script =
   catchError (Just <$> script) $ \exc -> do
     logMsg ("tried tactic failed with msg: " ++ errorMsg exc)
     pure Nothing
+
+-- | Repeats a tactic until it fails, returning a list of results.
+repeat :: TacticM a -> TacticM [a]
+repeat tactic = go []
+  where
+    go results =
+      catchError (Right <$> tactic) (pure . Left) >>= \case
+        Left exc -> do
+          logMsg ("repeat: tactic failed after " ++ show (length results) ++ " invocations with message: " ++ errorMsg exc)
+          pure (reverse results)
+        Right result ->
+          go (result : results)
+
+-- | Repeats a tactic until it fails.
+repeat_ :: Tactic -> Tactic
+repeat_ tactic = void (repeat tactic)
+
+getSubgoals :: TacticM [Subgoal]
+getSubgoals = gets currentGoals
+
+getSubgoal :: TacticM Subgoal
+getSubgoal = do
+  subgoals <- getSubgoals
+  case subgoals of
+    [] -> fail "getSubgoal: no subgoals"
+    subgoal:_ -> pure subgoal
+
+getAssumptions :: TacticM Env
+getAssumptions = assumptions <$> getSubgoal
 
 split :: Tactic
 split = do
@@ -352,3 +388,4 @@ focus script = do
 -- TODO: clear tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
+-- TODO: someAssumption tactic
