@@ -6,6 +6,9 @@ module SetTheoryProver.Lib.Logic
     ignoreFirstArg
   , compose
   , flipAssumptions
+  , orCommutative
+  , orAssociative
+  , orFalsity
   , contradiction
   , truthIsTrue
   , negNegElimination
@@ -63,6 +66,56 @@ flipAssumptions phi psi xi =
       "psi" ::: psi :->
         "phi" ::: phi :->
           "f" :@ "phi" :@ "psi"
+
+-- | Schema 'φ ∨ ψ ⇒ ψ ∨ φ'
+--
+-- >>> checkProof (orCommutative phi psi)
+orCommutative :: Formula -> Formula -> Proof
+orCommutative phi psi =
+  prove (phi :\/: psi :=>: psi :\/: phi) $ do
+    intro "h"
+    cases "h"
+    right >> assumption "h"
+    left  >> assumption "h"
+
+-- | Schema 'φ ∨ (ψ ∨ ξ) ⇔ (φ ∨ ψ) ∨ ξ'
+--
+-- >>> checkProof (orAssociative phi psi xi)
+orAssociative :: Formula -> Formula -> Formula -> Proof
+orAssociative phi psi xi =
+  prove ((phi :\/: (psi :\/: xi)) `iff` ((phi :\/: psi) :\/: xi)) $ do
+    split
+    -- =>
+    intro "h"
+    cases "h"
+    left >> left >> assumption "h"
+    cases "h"
+    left >> right >> assumption "h"
+    right >> assumption "h"
+    -- <=
+    intro "h"
+    cases "h"
+    cases "h"
+    left >> assumption "h"
+    right >> left >> assumption "h"
+    right >> right >> assumption "h"
+
+-- | Schema 'φ ∨ ⊥ ⇔ φ'
+--
+-- >>> checkProof (orFalsity phi)
+orFalsity :: Formula -> Proof
+orFalsity phi =
+  prove ((phi :\/: falsity) `iff` phi) $ do
+    split
+    -- =>
+    intro "h"
+    cases "h"
+    assumption "h"
+    applyProof (exFalso phi) >> assumption "h"
+    -- <=
+    intro "phi"
+    left
+    assumption "phi"
 
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --
@@ -143,5 +196,5 @@ exFalso phi =
 
 -- TODO: LEM
 -- TODO: De Morgan Laws
--- TODO: commutativity, associativity of :\/: and :/\:
+-- TODO: commutativity, associativity of :/\:
 -- TODO: distributivity of :/\: and :\/:
