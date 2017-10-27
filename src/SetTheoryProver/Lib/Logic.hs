@@ -9,6 +9,9 @@ module SetTheoryProver.Lib.Logic
   , orCommutative
   , orAssociative
   , orFalsity
+  , andCommutative
+  , andAssociative
+  , andTruth
   , contradiction
   , truthIsTrue
   , negNegElimination
@@ -117,6 +120,57 @@ orFalsity phi =
     left
     assumption "phi"
 
+-- | Schema 'φ ∧ ψ ⇒ ψ ∧ φ'
+--
+-- >>> checkProof (andCommutative phi psi)
+andCommutative :: Formula -> Formula -> Proof
+andCommutative phi psi =
+  prove (phi :/\: psi :=>: psi :/\: phi) $ do
+    intro "phiAndPsi"
+    destruct "phiAndPsi" "phi" "psi"
+    split
+    assumption "psi"
+    assumption "phi"
+
+-- | Schema 'φ ∧ (ψ ∧ ξ) ⇔ (φ ∧ ψ) ∧ ξ'
+--
+-- >>> checkProof (andAssociative phi psi xi)
+andAssociative :: Formula -> Formula -> Formula -> Proof
+andAssociative phi psi xi =
+  prove ((phi :/\: (psi :/\: xi)) `iff` ((phi :/\: psi) :/\: xi)) $ do
+    split
+    -- =>
+    intro "h"
+    destruct "h" "phi" "psiAndXi"
+    destruct "psiAndXi" "psi" "xi"
+    split
+    split >> assumption "phi" >> assumption "psi"
+    assumption "xi"
+    -- <=
+    intro "h"
+    destruct "h" "phiAndPsi" "xi"
+    destruct "phiAndPsi" "phi" "psi"
+    split
+    assumption "phi"
+    split >> assumption "psi" >> assumption "xi"
+
+-- | Schema 'φ ∧ ⊤ ⇔ φ'
+--
+-- >>> checkProof (andTruth phi)
+andTruth :: Formula -> Proof
+andTruth phi =
+  prove ((phi :/\: truth) `iff` phi) $ do
+    split
+    -- =>
+    intro "phiAndTruth"
+    destruct "phiAndTruth" "phi" "_"
+    assumption "phi"
+    -- <=
+    intro "phi"
+    split
+    assumption "phi"
+    exact truthIsTrue
+
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --
 -- >>> checkProof (contradiction phi)
@@ -196,5 +250,4 @@ exFalso phi =
 
 -- TODO: LEM
 -- TODO: De Morgan Laws
--- TODO: commutativity, associativity of :/\:
 -- TODO: distributivity of :/\: and :\/:
