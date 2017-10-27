@@ -6,20 +6,31 @@ module SetTheoryProver.Lib.Logic
     ignoreFirstArg
   , compose
   , flipAssumptions
+    -- * Monoid structure of ∨
   , orCommutative
   , orAssociative
   , orFalsity
+    -- * Monoid structure of ∧
   , andCommutative
   , andAssociative
   , andTruth
-  , contradiction
+    -- * Distributivity of ∨ and ∧
+  , andDistributesOverOr
+  , orDistributesOverAnd
+    -- * Properties of ⊤
   , truthIsTrue
+    -- * Properties of ⊥
+  , exFalso
+    -- * Properties relating ⊥ and ¬
+  , contradiction
+  , negCharacterisation
+    -- * Properties of ¬
   , negNegElimination
   , negNegIntroduction
-  , negCharacterisation
   , contrapositionConverse
-  , exFalso
   ) where
+
+import Prelude hiding (repeat)
 
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive
@@ -171,6 +182,64 @@ andTruth phi =
     assumption "phi"
     exact truthIsTrue
 
+-- | Schema 'φ ∧ (ψ ∨ ξ) ⇔ (φ ∧ ψ) ∨ (φ ∧ ξ)'
+--
+-- >>> checkProof (andDistributesOverOr phi psi xi)
+andDistributesOverOr :: Formula -> Formula -> Formula -> Proof
+andDistributesOverOr phi psi xi =
+  prove ((phi :/\: (psi :\/: xi)) `iff` ((phi :/\: psi) :\/: (phi :/\: xi))) $ do
+    split
+    -- =>
+    intro "h"
+    destruct "h" "phi" "psiOrXi"
+    cases "psiOrXi"
+    left  >> split >> assumption "phi" >> assumption "psiOrXi"
+    right >> split >> assumption "phi" >> assumption "psiOrXi"
+    -- <=
+    intro "h"
+    cases "h"
+    -- first case
+    destruct "h" "phi" "psi"
+    split
+    assumption "phi"
+    left
+    assumption "psi"
+    -- second case
+    destruct "h" "phi" "xi"
+    split
+    assumption "phi"
+    right
+    assumption "xi"
+
+-- | Schema 'φ ∨ (ψ ∧ ξ) ⇔ (φ ∨ ψ) ∧ (φ ∨ ξ)'
+--
+-- >>> checkProof (orDistributesOverAnd phi psi xi)
+orDistributesOverAnd :: Formula -> Formula -> Formula -> Proof
+orDistributesOverAnd phi psi xi =
+  prove ((phi :\/: (psi :/\: xi)) `iff` ((phi :\/: psi) :/\: (phi :\/: xi))) $ do
+    split
+    -- =>
+    intro "h"
+    cases "h"
+    -- first case
+    split >> repeat_ (left >> assumption "h")
+    -- second case
+    destruct "h" "psi" "xi"
+    split
+    right >> assumption "psi"
+    right >> assumption "xi"
+    -- <=
+    intro "h"
+    destruct "h" "phiOrPsi" "phiOrXi"
+    cases "phiOrPsi"
+    left >> assumption "phiOrPsi"
+    cases "phiOrXi"
+    left >> assumption "phiOrXi"
+    right
+    split
+    assumption "phiOrPsi"
+    assumption "phiOrXi"
+
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --
 -- >>> checkProof (contradiction phi)
@@ -250,4 +319,3 @@ exFalso phi =
 
 -- TODO: LEM
 -- TODO: De Morgan Laws
--- TODO: distributivity of :/\: and :\/:
