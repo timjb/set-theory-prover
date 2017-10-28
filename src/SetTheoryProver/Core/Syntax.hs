@@ -74,11 +74,14 @@ fvInTerm :: Term -> [VarName]
 fvInTerm (Var x) = [x]
 fvInTerm (DefDescr x f) = filter (/= x) (fvInFormula f)
 
-replaceInTerm :: VarName -> Term -> Term -> Term
-replaceInTerm x s t =
+replaceInTerm' :: VarName -> Term -> [VarName] -> Term -> Term
+replaceInTerm' x s fvInS t =
   case t of
     Var y -> if x == y then s else t
-    DefDescr y f -> if x == y then t else DefDescr y (replaceInFormula x s f)
+    DefDescr y g -> DefDescr y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
+
+replaceInTerm :: VarName -> Term -> Term -> Term
+replaceInTerm x s = replaceInTerm' x s (fvInTerm s)
 
 data Formula
   -- First-order logic (with equality)
@@ -166,17 +169,35 @@ fvInFormula f =
     Exists x g  -> filter (/= x) (fvInFormula g)
     Elem s t    -> fvInTerm s `varUnion` fvInTerm t
 
-replaceInFormula :: VarName -> Term -> Formula -> Formula
-replaceInFormula x s f =
+replaceInFormulaWithCaptureAndShadowingCheck :: VarName -> Term -> [VarName] -> VarName -> Formula -> Formula
+replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g =
+  if x == y then -- shadowing
+    g
+  else if y `elem` fvInS then
+    if x `elem` fvInFormula g then -- capturing
+      error ("variable '" ++ y ++ "' captured!")
+    else
+      g
+  else
+    replaceInFormula' x s fvInS g
+
+replaceInFormula' :: VarName -> Term -> [VarName] -> Formula -> Formula
+replaceInFormula' x s fvInS f =
   case f of
-    Implies g h -> Implies (replaceInFormula x s g) (replaceInFormula x s h)
-    And g h -> And (replaceInFormula x s g) (replaceInFormula x s h)
-    Or g h -> Or (replaceInFormula x s g) (replaceInFormula x s h)
-    Neg g -> Neg (replaceInFormula x s g)
-    Eq r t -> Eq (replaceInTerm x s r) (replaceInTerm x s t)
-    Forall y g -> if x == y then f else Forall y (replaceInFormula x s g)
-    Exists y g -> if x == y then f else Exists y (replaceInFormula x s g)
-    Elem r t -> Elem (replaceInTerm x s r) (replaceInTerm x s t)
+    Implies g h -> Implies (recurseFormula g) (recurseFormula h)
+    And g h -> And (recurseFormula g) (recurseFormula h)
+    Or g h -> Or (recurseFormula g) (recurseFormula h)
+    Neg g -> Neg (recurseFormula g)
+    Eq r t -> Eq (recurseTerm r) (recurseTerm t)
+    Forall y g -> Forall y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
+    Exists y g -> Exists y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
+    Elem r t -> Elem (recurseTerm r) (recurseTerm t)
+  where
+    recurseFormula = replaceInFormula' x s fvInS
+    recurseTerm = replaceInTerm' x s fvInS
+
+replaceInFormula :: VarName -> Term -> Formula -> Formula
+replaceInFormula x s = replaceInFormula' x s (fvInTerm s)
 
 -- TODO: move into other module?
 varSource :: [VarName]
