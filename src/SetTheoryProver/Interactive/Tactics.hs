@@ -20,7 +20,9 @@ module SetTheoryProver.Interactive.Tactics
   , destruct
   , contraposition
   , introAssumption
-  , have, by, from
+  , have
+  , suffices
+  , by, from
   , apply
   , applyProof
   , focus
@@ -63,6 +65,38 @@ repeat_ tactic = void (repeat tactic)
 
 getSubgoals :: TacticM [Subgoal]
 getSubgoals = gets currentGoals
+
+-- >>> embedding "abc" "bacha"
+-- Right [1,0,2]
+--
+-- >>> embedding "ax" "abc"
+-- Left 'x'
+embedding :: Eq a => [a] -> [a] -> Either a [Int]
+embedding xs ys =
+  forM xs $ \x ->
+    case lookup x ysWithIndex of
+      Nothing -> Left x
+      Just i  -> Right i
+  where
+    ysWithIndex = zip ys [0..]
+
+setSubgoals :: [Subgoal] -> Tactic
+setSubgoals subgoals' = do
+  state <- get
+  emb <-
+    case embedding (currentGoals state) subgoals' of
+      Left subgoal -> fail ("setSubgoals: current subgoal with claim " ++ show (claim subgoal) ++ " is not among the new subgoals")
+      Right emb -> pure emb
+  put $
+    state
+    { currentGoals = subgoals'
+    , constructProof =
+        \subproofs ->
+          if length subproofs < length subgoals' then
+            error "setSubgoals: received too few subproofs!"
+          else
+            constructProof state (map (subproofs !!) emb)
+    }
 
 getSubgoal :: TacticM Subgoal
 getSubgoal = do
@@ -326,6 +360,19 @@ have name formula toTactic scriptLike = do
   introAssumption name formula
   focus (toTactic scriptLike)
 
+swapSubgoals :: Tactic
+swapSubgoals = do
+  subgoals <- getSubgoals
+  case subgoals of
+    firstSubgoal:secondSubgoal:otherSubgoals -> setSubgoals (secondSubgoal:firstSubgoal:otherSubgoals)
+    _ -> fail "swapSubgoals: fewer than two subgoals!"
+
+suffices :: String -> Formula -> (a -> Tactic) -> a -> Tactic
+suffices name formula toTactic scriptLike = do
+  introAssumption name formula
+  swapSubgoals
+  focus (toTactic scriptLike)
+
 by :: Tactic -> Tactic
 by = id
 
@@ -386,4 +433,3 @@ focus script = do
 -- TODO: auto tactic
 -- TODO: admit tactic
 -- TODO: someAssumption tactic
--- TODO: reorder goals

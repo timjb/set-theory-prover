@@ -309,11 +309,12 @@ negNegElimination :: Formula -> Proof
 negNegElimination phi =
   prove (Neg (Neg phi) :=>: phi) $ do
     intro "negNegPhi"
-    have "truthImpliesPhi" (truth :=>: phi) by $ do
-      contraposition
-      applyProof (contradiction (Neg phi))
-      assumption "negNegPhi"
-    exact ("truthImpliesPhi" :@ LCPrf truthIsTrue)
+    suffices "truthImpliesPhi" (truth :=>: phi) by $ do
+      apply "truthImpliesPhi"
+      exact truthIsTrue
+    contraposition
+    applyProof (contradiction (Neg phi))
+    assumption "negNegPhi"
 
 -- | Schema 'φ ⇒ ¬¬φ'
 --
@@ -331,13 +332,15 @@ negCharacterisation' :: Formula -> Proof
 negCharacterisation' phi =
   prove ((phi :=>: falsity) :=>: Neg phi) $ do
     intro "notPhi'"
-    have "truthImpliesNegPhi" (truth :=>: Neg phi) by $ do
-      contraposition
-      intro "negNegPhi"
-      apply "notPhi'"
-      applyProof (negNegElimination phi)
-      assumption "negNegPhi"
-    exact ("truthImpliesNegPhi" :@ LCPrf truthIsTrue)
+    suffices "truthImpliesNegPhi" (truth :=>: Neg phi) by $ do
+      apply "truthImpliesNegPhi"
+      exact truthIsTrue
+    contraposition
+    intro "negNegPhi"
+    apply "notPhi'"
+    applyProof (negNegElimination phi)
+    assumption "negNegPhi"
+
 
 -- | Schema '¬φ ⇔ (φ ⇒ ⊥)'
 --
@@ -511,12 +514,12 @@ lem phi =
     -- from here on, the proof is constructive
     applyProof (negCharacterisation' (Neg (phi :\/: Neg phi)))
     intro "negPhiOrNegPhi"
-    have "phiOrNegPhi" (phi :\/: Neg phi) by $ do
-      right
-      applyProof (negCharacterisation' phi)
-      intro "phi"
-      have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
+    suffices "phiOrNegPhi" (phi :\/: Neg phi) by $
       exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
+    right
+    applyProof (negCharacterisation' phi)
+    intro "phi"
+    have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
     exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
 
 -- TODO:

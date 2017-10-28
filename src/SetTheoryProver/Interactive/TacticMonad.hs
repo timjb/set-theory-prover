@@ -27,7 +27,7 @@ data Subgoal
   = Subgoal
   { assumptions :: Env
   , claim :: Formula
-  }
+  } deriving (Eq)
 
 data ProofState
   = ProofState
