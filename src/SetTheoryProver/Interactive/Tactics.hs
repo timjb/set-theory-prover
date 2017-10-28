@@ -14,6 +14,7 @@ module SetTheoryProver.Interactive.Tactics
   , intro
   , intros
   , assumption
+  , someAssumption
   , exact
   , refl
   , cases
@@ -202,6 +203,14 @@ assumption name = do
       when (formula /= formula') $
         fail ("assumption '" ++ name ++ "' doesn't prove the current goal!")
   exact (LCVar name)
+
+someAssumption :: Tactic
+someAssumption = do
+  subgoal <- getSubgoal
+  asms <- getAssumptions
+  case lookup (claim subgoal) (map (\(a,b) -> (b,a)) asms) of
+    Nothing -> fail "someAssumption: no assumption matching goal!"
+    Just asmName -> assumption asmName
 
 exact :: ToLC a => a -> Tactic
 exact proofLike = do
@@ -432,4 +441,3 @@ focus script = do
 -- TODO: clear tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
--- TODO: someAssumption tactic

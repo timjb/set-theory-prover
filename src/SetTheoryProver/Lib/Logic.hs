@@ -273,8 +273,7 @@ orDistributesOverAnd phi psi xi =
     -- second case
     destruct "psiAndXi" "psi" "xi"
     split
-    right >> assumption "psi"
-    right >> assumption "xi"
+    repeat_ (right >> someAssumption)
     -- <=
     intro "h"
     destruct "h" "phiOrPsi" "phiOrXi"
@@ -339,8 +338,7 @@ negCharacterisation' phi =
     intro "negNegPhi"
     apply "notPhi'"
     applyProof (negNegElimination phi)
-    assumption "negNegPhi"
-
+    someAssumption
 
 -- | Schema '¬φ ⇔ (φ ⇒ ⊥)'
 --
