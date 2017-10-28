@@ -20,7 +20,7 @@ module SetTheoryProver.Interactive.Tactics
   , destruct
   , contraposition
   , introAssumption
-  , have, by
+  , have, by, from
   , apply
   , applyProof
   , focus
@@ -327,13 +327,16 @@ introAssumption name formula = do
           _ -> error "have: expected to get at least two proofs!"
     }
 
-have :: String -> Formula -> () -> Tactic -> Tactic
-have name formula () script = do
+have :: String -> Formula -> (a -> Tactic) -> a -> Tactic
+have name formula toTactic scriptLike = do
   introAssumption name formula
-  focus script
+  focus (toTactic scriptLike)
 
-by :: ()
-by = ()
+by :: Tactic -> Tactic
+by = id
+
+from :: Proof -> Tactic
+from = exact
 
 apply :: LC -> Tactic
 apply lambdaTerm = do
