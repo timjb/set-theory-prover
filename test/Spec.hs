@@ -62,29 +62,12 @@ reflProof =
     intro "h"
     refl
 
-orCommutative :: Test
-orCommutative =
-  checkTacticProof (phi :\/: psi :=>: psi :\/: phi) $ do
-    intro "phiOrPsi"
-    cases "phiOrPsi" "phi" "psi"
-    right; assumption "phi"
-    left; assumption "psi"
-
 proofWithContraposition :: Test
 proofWithContraposition =
   checkTacticProof ((Neg phi :=>: Neg psi) :=>: psi :=>: phi) $ do
     intro "negPhiImpliesNegPsi"
     contraposition
     assumption "negPhiImpliesNegPsi"
-
-andCommutative :: Test
-andCommutative =
-  checkTacticProof (phi :/\: psi :=>: psi :/\: phi) $ do
-    intro "h"
-    destruct "h" "hl" "hr"
-    split
-    assumption "hr"
-    assumption "hl"
 
 proofWithHave :: Test
 proofWithHave =
@@ -96,31 +79,6 @@ proofWithHave =
     split
     assumption "phiOrPsi"
     assumption "phiOrPsi"
-
--- TODO:
---   phi :=>: Neg (Neg phi)
---   phi :/\: (psi :\/: xi) :=>: (phi :/\: psi) :\/: (phi :/\: xi)
---   symmetry of =
---   transitivity of =
-
-currying :: Test
-currying =
-  checkTacticProof ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
-    split
-    -- =>
-    intros ["uncurriedFn", "phi", "psi"]
-    apply "uncurriedFn"
-    split
-    assumption "phi"
-    assumption "psi"
-    -- <=
-    intros ["curriedFn", "phiAndPsi"]
-    destruct "phiAndPsi" "phi" "psi"
-    have "psiImpliesXi" (psi :=>: xi) by $ do
-      apply "curriedFn"
-      assumption "phi"
-    apply "psiImpliesXi"
-    assumption "psi"
 
 incompleteProof :: Test
 incompleteProof = checkNoTacticProof "there are open subgoals" truth (pure ())
@@ -138,11 +96,8 @@ main = do
     , checkTacticProof (phi :=>: psi :=>: psi :\/: phi) (intros ["h1", "h2"] >> right >> assumption "h1")
     , trySkipsErrors
     , reflProof
-    , orCommutative
     , proofWithContraposition
-    , andCommutative
     , proofWithHave
-    , currying
     , incompleteProof
     , wrongAssumptionName
     ]

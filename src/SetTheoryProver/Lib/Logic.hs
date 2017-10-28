@@ -6,6 +6,10 @@ module SetTheoryProver.Lib.Logic
     ignoreFirstArg
   , compose
   , flipAssumptions
+    -- * Currying
+  , curry
+  , uncurry
+  , currying
     -- * Monoid structure of ∨
   , orCommutative
   , orAssociative
@@ -40,7 +44,7 @@ module SetTheoryProver.Lib.Logic
   , lem
   ) where
 
-import Prelude hiding (repeat)
+import Prelude hiding (repeat, curry, uncurry)
 
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive
@@ -90,6 +94,39 @@ flipAssumptions phi psi xi =
       "psi" ::: psi :->
         "phi" ::: phi :->
           "f" :@ "phi" :@ "psi"
+
+-- | Schema '(φ ∧ ψ ⇒ ξ) ⇒ φ ⇒ ψ ⇒ ξ'
+--
+-- >>> checkProof (curry phi psi xi)
+curry :: Formula -> Formula -> Formula -> Proof
+curry phi psi xi =
+  prove ((phi :/\: psi :=>: xi) :=>: phi :=>: psi :=>: xi) $ do
+    intros ["uncurried", "phi", "psi"]
+    apply "uncurried"
+    split
+    assumption "phi"
+    assumption "psi"
+
+-- | Schema '(φ ⇒ ψ ⇒ ξ) ⇒ φ ∧ ψ ⇒ ξ'
+--
+-- >>> checkProof (uncurry phi psi xi)
+uncurry :: Formula -> Formula -> Formula -> Proof
+uncurry phi psi xi =
+  prove ((phi :=>: psi :=>: xi) :=>: phi :/\: psi :=>: xi) $ do
+    intros ["curriedFn", "phiAndPsi"]
+    destruct "phiAndPsi" "phi" "psi"
+    have "psiImpliesXi" (psi :=>: xi) by $ do
+      apply "curriedFn"
+      assumption "phi"
+    apply "psiImpliesXi"
+    assumption "psi"
+
+currying :: Formula -> Formula -> Formula -> Proof
+currying phi psi xi =
+  prove ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
+    split
+    exact (curry phi psi xi)
+    exact (uncurry phi psi xi)
 
 -- | Schema 'φ ∨ ψ ⇒ ψ ∨ φ'
 --
@@ -481,3 +518,7 @@ lem phi =
       have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
       exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
     exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
+
+-- TODO:
+--   symmetry of =
+--   transitivity of =
