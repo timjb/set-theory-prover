@@ -2,7 +2,7 @@
 
 module SetTheoryProver.Lib.Logic
   (
-    -- * Consequences of the axioms
+    -- * Properties of ⇒
     ignoreFirstArg
   , compose
   , flipAssumptions
@@ -97,10 +97,10 @@ flipAssumptions phi psi xi =
 orCommutative :: Formula -> Formula -> Proof
 orCommutative phi psi =
   prove (phi :\/: psi :=>: psi :\/: phi) $ do
-    intro "h"
-    cases "h"
-    right >> assumption "h"
-    left  >> assumption "h"
+    intro "phiOrPsi"
+    cases "phiOrPsi" "phi" "psi"
+    right >> assumption "phi"
+    left  >> assumption "psi"
 
 -- | Schema 'φ ∨ (ψ ∨ ξ) ⇔ (φ ∨ ψ) ∨ ξ'
 --
@@ -110,19 +110,19 @@ orAssociative phi psi xi =
   prove ((phi :\/: (psi :\/: xi)) `iff` ((phi :\/: psi) :\/: xi)) $ do
     split
     -- =>
-    intro "h"
-    cases "h"
-    left >> left >> assumption "h"
-    cases "h"
-    left >> right >> assumption "h"
-    right >> assumption "h"
+    intro "phiOrPsiOrXi"
+    cases "phiOrPsiOrXi" "phi" "psiOrXi"
+    left >> left >> assumption "phi"
+    cases "psiOrXi" "psi" "xi"
+    left >> right >> assumption "psi"
+    right >> assumption "xi"
     -- <=
-    intro "h"
-    cases "h"
-    cases "h"
-    left >> assumption "h"
-    right >> left >> assumption "h"
-    right >> right >> assumption "h"
+    intro "phiOrPsiOrXi"
+    cases "phiOrPsiOrXi" "phiOrPsi" "xi"
+    cases "phiOrPsi" "phi" "psi"
+    left >> assumption "phi"
+    right >> left >> assumption "psi"
+    right >> right >> assumption "xi"
 
 -- | Schema 'φ ∨ ⊥ ⇔ φ'
 --
@@ -132,10 +132,10 @@ orFalsity phi =
   prove ((phi :\/: falsity) `iff` phi) $ do
     split
     -- =>
-    intro "h"
-    cases "h"
-    assumption "h"
-    applyProof (exFalso phi) >> assumption "h"
+    intro "phiOrFalsity"
+    cases "phiOrFalsity" "phi" "falsity"
+    assumption "phi"
+    applyProof (exFalso phi) >> assumption "falsity"
     -- <=
     intro "phi"
     left
@@ -200,22 +200,22 @@ andDistributesOverOr phi psi xi =
   prove ((phi :/\: (psi :\/: xi)) `iff` ((phi :/\: psi) :\/: (phi :/\: xi))) $ do
     split
     -- =>
-    intro "h"
-    destruct "h" "phi" "psiOrXi"
-    cases "psiOrXi"
-    left  >> split >> assumption "phi" >> assumption "psiOrXi"
-    right >> split >> assumption "phi" >> assumption "psiOrXi"
+    intro "phiAndPsiOrXi"
+    destruct "phiAndPsiOrXi" "phi" "psiOrXi"
+    cases "psiOrXi" "psi" "xi"
+    left  >> split >> assumption "phi" >> assumption "psi"
+    right >> split >> assumption "phi" >> assumption "xi"
     -- <=
     intro "h"
-    cases "h"
+    cases "h" "phiAndPsi" "phiAndXi"
     -- first case
-    destruct "h" "phi" "psi"
+    destruct "phiAndPsi" "phi" "psi"
     split
     assumption "phi"
     left
     assumption "psi"
     -- second case
-    destruct "h" "phi" "xi"
+    destruct "phiAndXi" "phi" "xi"
     split
     assumption "phi"
     right
@@ -229,26 +229,30 @@ orDistributesOverAnd phi psi xi =
   prove ((phi :\/: (psi :/\: xi)) `iff` ((phi :\/: psi) :/\: (phi :\/: xi))) $ do
     split
     -- =>
-    intro "h"
-    cases "h"
+    intro "phiOrPsiAndXi"
+    cases "phiOrPsiAndXi" "phi" "psiAndXi"
     -- first case
-    split >> repeat_ (left >> assumption "h")
+    split >> repeat_ (left >> assumption "phi")
     -- second case
-    destruct "h" "psi" "xi"
+    destruct "psiAndXi" "psi" "xi"
     split
     right >> assumption "psi"
     right >> assumption "xi"
     -- <=
     intro "h"
     destruct "h" "phiOrPsi" "phiOrXi"
-    cases "phiOrPsi"
-    left >> assumption "phiOrPsi"
-    cases "phiOrXi"
-    left >> assumption "phiOrXi"
+    cases "phiOrPsi" "phi" "psi"
+    -- first case
+    left >> assumption "phi"
+    -- second case
+    cases "phiOrXi" "phi" "xi"
+    -- first subcase (of second case)
+    left >> assumption "phi"
+    -- second subcase (of second case)
     right
     split
-    assumption "phiOrPsi"
-    assumption "phiOrXi"
+    assumption "psi"
+    assumption "xi"
 
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --
@@ -365,9 +369,9 @@ deMorgan1b phi psi =
     applyProof (negCharacterisation' (phi :/\: psi))
     intro "phiAndPsi"
     destruct "phiAndPsi" "phi" "psi"
-    cases "negPhiOrNegPsi"
-    exact (LCPrf (contradiction phi) :@ "negPhiOrNegPsi" :@ "phi")
-    exact (LCPrf (contradiction psi) :@ "negPhiOrNegPsi" :@ "psi")
+    cases "negPhiOrNegPsi" "negPhi" "negPsi"
+    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
+    exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")
 
 -- | Schema '¬(φ ∧ ψ) ⇔ ¬φ ∨ ¬ψ'
 --
@@ -410,9 +414,9 @@ deMorgan2b phi psi =
     destruct "negPhiAndNegPsi" "negPhi" "negPsi"
     applyProof (negCharacterisation' (phi :\/: psi))
     intro "phiOrPsi"
-    cases "phiOrPsi"
-    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phiOrPsi")
-    exact (LCPrf (contradiction psi) :@ "negPsi" :@ "phiOrPsi")
+    cases "phiOrPsi" "phi" "psi"
+    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
+    exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")
 
 -- | Schema '¬(φ ∨ ψ) ⇔ ¬φ ∧ ¬ψ'
 --
@@ -432,9 +436,9 @@ implicationOr1 phi psi =
   prove ((phi :=>: psi) :=>: Neg phi :\/: psi) $ do
     intro "phiImpliesPsi"
     have "phiOrNegPhi" (phi :\/: Neg phi) from (lem phi)
-    cases "phiOrNegPhi"
-    right >> apply "phiImpliesPsi" >> assumption "phiOrNegPhi"
-    left >> assumption "phiOrNegPhi"
+    cases "phiOrNegPhi" "phi" "negPhi"
+    right >> apply "phiImpliesPsi" >> assumption "phi"
+    left >> assumption "negPhi"
 
 -- | Schema '¬φ ∨ ψ ⇒ φ ⇒ ψ'
 --
@@ -443,12 +447,12 @@ implicationOr2 :: Formula -> Formula -> Proof
 implicationOr2 phi psi =
   prove (Neg phi :\/: psi :=>: phi :=>: psi) $ do
     intros ["negPhiOrPsi", "phi"]
-    cases "negPhiOrPsi"
+    cases "negPhiOrPsi" "negPhi" "psi"
     -- first case
     applyProof (exFalso psi)
-    exact (LCPrf (contradiction phi) :@ "negPhiOrPsi" :@ "phi")
+    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
     -- second case
-    assumption "negPhiOrPsi"
+    assumption "psi"
 
 -- | Schema '(φ ⇒ ψ) ⇔ ¬φ ∨ ψ'
 --

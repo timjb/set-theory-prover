@@ -206,21 +206,25 @@ refl = do
         }
     _:_ -> fail "refl: goal must be of the form 's :=: t'!"
 
-cases :: String -> Tactic
-cases name = do
+cases :: String -> String -> String -> Tactic
+cases nameDisjunction nameLeftDisjunct nameRightDisjunct = do
   state <- get
   (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
     case currentGoals state of
       [] -> fail "cases: no goals"
       subgoal : otherGoals -> pure (subgoal, otherGoals)
   (phi, psi) <-
-    case lookup name asms of
-      Nothing -> fail ("cases: '" ++ name ++ "' is not an assumption!")
+    case lookup nameDisjunction asms of
+      Nothing -> fail ("cases: '" ++ nameDisjunction ++ "' is not an assumption!")
       Just (phi :\/: psi) -> pure (phi, psi)
-      Just _ -> fail ("cases: assumption '" ++ name ++ "' is not of the form 'phi :\\/: psi'!")
+      Just _ -> fail ("cases: assumption '" ++ nameDisjunction ++ "' is not of the form 'phi :\\/: psi'!")
+  when (nameLeftDisjunct `elem` map fst asms) $
+    fail ("destruct: name '" ++ nameLeftDisjunct ++ "' already in scope!")
+  when (nameRightDisjunct `elem` map fst asms) $
+    fail ("destruct: name '" ++ nameRightDisjunct ++ "' already in scope!")
   let
-    asmsWithPhi = set name phi asms
-    asmsWithPsi = set name psi asms
+    asmsWithPhi = (nameLeftDisjunct, phi) : asms
+    asmsWithPsi = (nameRightDisjunct, psi) : asms
     subgoalWithPhi = Subgoal { assumptions = asmsWithPhi, claim = target }
     subgoalWithPsi = Subgoal { assumptions = asmsWithPsi, claim = target }
   put $
@@ -232,22 +236,12 @@ cases name = do
             let
               subgoalProof =
                 LCPrf (or_elim phi psi target)
-                  :@ (name ::: phi :-> subgoalProofWithPhi)
-                  :@ (name ::: psi :-> subgoalProofWithPsi)
-                  :@ (LCVar name)
+                  :@ (nameLeftDisjunct ::: phi :-> subgoalProofWithPhi)
+                  :@ (nameRightDisjunct ::: psi :-> subgoalProofWithPsi)
+                  :@ (LCVar nameDisjunction)
             in constructProof state (subgoalProof:otherProofs)
           _ -> error "cases: expected to get at least two proofs (for the claim, one assuming phi, one assuming psi)"
     }
-  where
-    set :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
-    set key val assocList =
-      case assocList of
-        [] -> [(key, val)]
-        (key1, val1) : rest ->
-          if key1 == key then
-            (key, val) : rest
-          else
-            (key1, val1) : set key val rest
 
 destruct :: String -> String -> String -> Tactic
 destruct asmName leftAsmName rightAsmName = do
@@ -392,3 +386,4 @@ focus script = do
 -- TODO: auto tactic
 -- TODO: admit tactic
 -- TODO: someAssumption tactic
+-- TODO: reorder goals

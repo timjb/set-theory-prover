@@ -65,10 +65,10 @@ reflProof =
 orCommutative :: Test
 orCommutative =
   checkTacticProof (phi :\/: psi :=>: psi :\/: phi) $ do
-    intro "h"
-    cases "h"
-    right; assumption "h"
-    left; assumption "h"
+    intro "phiOrPsi"
+    cases "phiOrPsi" "phi" "psi"
+    right; assumption "phi"
+    left; assumption "psi"
 
 proofWithContraposition :: Test
 proofWithContraposition =
