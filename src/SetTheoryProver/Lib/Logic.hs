@@ -406,7 +406,7 @@ deMorgan1b phi psi =
     intro "negPhiOrNegPsi"
     applyProof (negCharacterisation' (phi :/\: psi))
     intro "phiAndPsi"
-    destruct "phiAndPsi" "phi" "psi"
+    destruct "phiAndPsi" "phi" "psi" >> clear "phiAndPsi"
     cases "negPhiOrNegPsi" "negPhi" "negPsi"
     exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
     exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")

@@ -8,6 +8,7 @@ module SetTheoryProver.Interactive.Tactics
   , getSubgoals
   , getSubgoal
   , getAssumptions
+  , clear
   , split
   , left
   , right
@@ -108,6 +109,17 @@ getSubgoal = do
 
 getAssumptions :: TacticM Env
 getAssumptions = assumptions <$> getSubgoal
+
+-- | Drops an assumption
+clear :: String -> Tactic
+clear name = do
+  state <- get
+  (currentSubgoal, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "clear: no goals"
+      currentSubgoal:otherSubgoals -> pure (currentSubgoal, otherSubgoals)
+  let currentSubgoal' = currentSubgoal { assumptions = filter ((/= name) . fst) (assumptions currentSubgoal) }
+  put $ state { currentGoals = currentSubgoal':otherSubgoals }
 
 split :: Tactic
 split = do
@@ -438,6 +450,5 @@ focus script = do
 -- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: ex falso tactic
--- TODO: clear tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
