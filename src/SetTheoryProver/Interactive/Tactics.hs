@@ -28,6 +28,7 @@ module SetTheoryProver.Interactive.Tactics
   , apply
   , applyProof
   , focus
+  , generalising
   ) where
 
 import Prelude hiding (repeat)
@@ -444,10 +445,27 @@ focus script = do
     logMsg ("focus: tactic did not fully solve subgoal '" ++ show (claim subgoal) ++ "'")
   pure res
 
+generalising :: Tactic
+generalising = do
+  state <- get
+  (asms, x, phi, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "generalising: no goals"
+      Subgoal { assumptions = asms, claim = Forall x phi } : otherSubgoals -> pure (asms, x, phi, otherSubgoals)
+      _:_ -> fail "generalising: expected goal to be of the form 'Forall x phi'"
+  let asms' = filter ((x `notElem`) . fvInFormula . snd) asms
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms', claim = phi } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "generalising: expected to get at least one proof!"
+          phiProof:otherProofs -> constructProof state (LCForall x phiProof : otherProofs)
+    }
+
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
 -- TODO: tactic for instantiation of forall
--- TODO: tactic for generalization
 -- TODO: tactic for existential introduction
 -- TODO: ex falso tactic
 -- TODO: auto tactic

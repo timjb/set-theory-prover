@@ -80,6 +80,15 @@ proofWithHave =
     assumption "phiOrPsi"
     assumption "phiOrPsi"
 
+proofWithGeneralising :: Test
+proofWithGeneralising =
+  checkTacticProof (phi :=>: Forall "p" ("p" :=: "p" :/\: phi)) $ do
+    intro "phi"
+    generalising
+    split
+    refl
+    assumption "phi"
+
 incompleteProof :: Test
 incompleteProof = checkNoTacticProof "there are open subgoals" truth (pure ())
 
@@ -98,6 +107,7 @@ main = do
     , reflProof
     , proofWithContraposition
     , proofWithHave
+    , proofWithGeneralising
     , incompleteProof
     , wrongAssumptionName
     ]

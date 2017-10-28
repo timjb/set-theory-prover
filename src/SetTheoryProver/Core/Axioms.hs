@@ -124,8 +124,8 @@ ax6 x phi psi = axiom (antecedent :=>: consequent)
 
 -- TODO: According to wikipedia this isn't strictly needed. Is this right? In that case, derive it.
 -- | Axiom schema 'φ ⇒ (∀x. φ)' if x is not free in φ
-ax7 :: Formula -> VarName -> Proof
-ax7 phi x =
+ax7 :: VarName -> Formula -> Proof
+ax7 x phi =
   if x `elem` fvInFormula phi then
     error "ax7: variable must not occur freely in formula!"
   else

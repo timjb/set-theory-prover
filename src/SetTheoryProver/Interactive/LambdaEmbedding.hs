@@ -21,6 +21,7 @@ data LC
   | LCApp LC LC                 -- ^ application
   | LCVar VarName               -- ^ variable
   | LCPrf Proof                 -- ^ proof
+  | LCForall VarName LC         -- ^ all-quantification
 
 infix 8 :::
 infixl 4 :@
@@ -50,10 +51,11 @@ pattern s :@ t = LCApp s t
 freeVariables :: LC -> [VarName]
 freeVariables t =
   case t of
-    LCAbs arg s -> filter (/= fst arg) (freeVariables s)
-    LCApp u v   -> freeVariables u `varUnion` freeVariables v
-    LCVar x     -> [x]
-    LCPrf _     -> []
+    LCAbs arg s  -> filter (/= fst arg) (freeVariables s)
+    LCApp u v    -> freeVariables u `varUnion` freeVariables v
+    LCVar x      -> [x]
+    LCPrf _      -> []
+    LCForall _ s -> freeVariables s
 
 inferType :: [(VarName, Formula)] -> LC -> Either String Formula
 inferType env t =
@@ -75,6 +77,19 @@ inferType env t =
         Just formula -> Right formula
     LCPrf p ->
       Right (getFormula p)
+    LCForall x body ->
+      let
+        typeOfVariableContainsX v =
+          case lookup v env of
+            Nothing -> False
+            Just formula -> x `elem` fvInFormula formula
+      in
+        case filter typeOfVariableContainsX (freeVariables body) of
+          v:_ ->
+            Left
+              ("forbidden usage of lambda variable '" ++ v ++ "' (whose formula contains '" ++ x ++ "') " ++
+               "in term proving all-quantified (over '" ++ x ++ "') subformula")
+          [] -> Forall x <$> inferType env body
 
 translate :: LC -> Proof
 translate lambdaTerm = extract (fst (go [] lambdaTerm))
@@ -115,16 +130,35 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
                 (body', _) = go env' body
               in
                 go env (LCAbs (x, phi) body')
+            LCForall y forallBody | x `elem` freeVariables body ->
+              if y `elem` fvInFormula phi then
+                error
+                  ("translate: forbidden usage of lambda variable '" ++ x ++ "' (whose formula contains '" ++ y ++ "') " ++
+                   "in term proving all-quantified (over '" ++ y ++ "') subformula")
+              else
+                let
+                  (forallBody', forallBodyType) = go env (LCAbs (x, phi) forallBody)
+                in
+                  case forallBodyType of
+                    phi' :=>: psi | phi == phi' ->
+                      go env (LCAbs (x, phi) ((LCPrf (ax6 y phi psi) `LCApp` (LCForall y forallBody')) `LCApp` (LCPrf (ax7 y phi) `LCApp` LCVar x)))
+                    _ -> error "translate: expected a function type with two arguments, the first of which is phi!"
             _ -> -- x is not free in body
               let
                 (body', bodyType) = go env body
               in
                 (LCPrf (ax2 bodyType phi) `LCApp` body', phi `Implies` bodyType)
         LCPrf p -> (LCPrf p, getFormula p)
+        LCForall x body ->
+          let
+            (body', bodyType) = go env body
+          in
+            (LCForall x body', Forall x bodyType)
     extract :: LC -> Proof
     extract term =
       case term of
         LCPrf p -> p
         LCApp fun arg -> extract fun `mp` extract arg
+        LCForall x body -> generalise x (extract body)
         LCAbs _ _ -> error "translate: didn't expect function in extract"
         LCVar _ -> error "translate: didn't expect variable in extract"
