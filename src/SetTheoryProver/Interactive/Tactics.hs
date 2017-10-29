@@ -29,6 +29,7 @@ module SetTheoryProver.Interactive.Tactics
   , applyProof
   , focus
   , generalising
+  , transport
   ) where
 
 import Prelude hiding (repeat)
@@ -461,6 +462,32 @@ generalising = do
         \case
           [] -> error "generalising: expected to get at least one proof!"
           phiProof:otherProofs -> constructProof state (LCForall x phiProof : otherProofs)
+    }
+
+transport :: LC -> (Term -> Formula) -> Tactic
+transport term instantiateFormula = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "rewrite: no goal"
+      subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
+  (s, t) <-
+    case inferType asms term of
+      Left err -> fail ("transport: failed to infer type of given term. Reason: '" ++ err ++ "'")
+      Right (s :=: t) -> pure (s, t)
+      Right _ -> fail ("transport: expected type of term to be of the form 's :=: t'")
+  when (target /= instantiateFormula t) $
+    fail ("transport: target does not match formula '" ++ show (instantiateFormula t) ++ "'")
+  let z = freshVar (varsInFormula (instantiateFormula (Var "x")))
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms, claim = instantiateFormula s } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "transport: expected to get at least one proof"
+          p:ps ->
+            let p' = LCPrf (ax9 s t z (instantiateFormula (Var z))) :@ term :@ p
+            in constructProof state (p':ps)
     }
 
 -- TODO: 'remainsToShow' tactic

@@ -42,6 +42,8 @@ module SetTheoryProver.Lib.Logic
   , implicationOr
     -- * Law of Excluded Middle
   , lem
+    -- * Properties of =
+  , symmetry
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)
@@ -502,7 +504,7 @@ implicationOr phi psi =
     exact (implicationOr1 phi psi)
     exact (implicationOr2 phi psi)
 
--- Schema 'φ ∨ ¬φ'
+-- | Schema 'φ ∨ ¬φ'
 --
 -- >>> checkProof (lem phi)
 lem :: Formula -> Proof
@@ -520,6 +522,12 @@ lem phi =
     have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
     exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
 
--- TODO:
---   symmetry of =
---   transitivity of =
+-- | Schema 's = t ⇒ t = s'
+--
+-- >>> checkProof (symmetry (Var "x") (Var "y"))
+symmetry :: Term -> Term -> Proof
+symmetry s t =
+  prove (s :=: t :=>: t :=: s) $ do
+    intro "s=t"
+    transport "s=t" (\z -> z :=: s)
+    refl

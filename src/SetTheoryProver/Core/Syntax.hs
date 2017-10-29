@@ -12,9 +12,11 @@ module SetTheoryProver.Core.Syntax
   , freshVar
   -- ** In terms
   , fvInTerm
+  , varsInTerm
   , replaceInTerm
   -- ** In formulas
   , fvInFormula
+  , varsInFormula
   , replaceInFormula
   -- * Derived logical connectives
   , iff
@@ -73,6 +75,10 @@ instance Show Term where
 fvInTerm :: Term -> [VarName]
 fvInTerm (Var x) = [x]
 fvInTerm (DefDescr x f) = filter (/= x) (fvInFormula f)
+
+varsInTerm :: Term -> [VarName]
+varsInTerm (Var x) = [x]
+varsInTerm (DefDescr x f) = [x] `varUnion` varsInFormula f
 
 replaceInTerm' :: VarName -> Term -> [VarName] -> Term -> Term
 replaceInTerm' x s fvInS t =
@@ -168,6 +174,18 @@ fvInFormula f =
     Forall x g  -> filter (/= x) (fvInFormula g)
     Exists x g  -> filter (/= x) (fvInFormula g)
     Elem s t    -> fvInTerm s `varUnion` fvInTerm t
+
+varsInFormula :: Formula -> [VarName]
+varsInFormula f =
+  case f of
+    Implies g h -> varsInFormula g `varUnion` varsInFormula h
+    And g h     -> varsInFormula g `varUnion` varsInFormula h
+    Or g h      -> varsInFormula g `varUnion` varsInFormula h
+    Neg g       -> varsInFormula g
+    Eq s t      -> varsInTerm s `varUnion` varsInTerm t
+    Forall x g  -> [x] `varUnion` varsInFormula g
+    Exists x g  -> [x] `varUnion` varsInFormula g
+    Elem s t    -> varsInTerm s `varUnion` varsInTerm t
 
 replaceInFormulaWithCaptureAndShadowingCheck :: VarName -> Term -> [VarName] -> VarName -> Formula -> Formula
 replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g =
