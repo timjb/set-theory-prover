@@ -46,6 +46,7 @@ module SetTheoryProver.Lib.Logic
   , symmetry
   , transitivity
     -- * Properties relating ∀ and ∃
+  , forallImpliesExists
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)
@@ -544,3 +545,13 @@ transitivity s t u =
     intro "t=u"
     transport "t=u" (\r -> s :=: r)
     assumption "s=t"
+
+-- | Schema '(∀x. φ) ⇒ ∃x. φ'
+--
+-- >>> checkProof (forallImpliesExists "x" phi)
+forallImpliesExists :: VarName -> Formula -> Proof
+forallImpliesExists x phi =
+  prove (Forall x phi :=>: Exists x phi) $ do
+    intro "h"
+    exists "a"
+    instantiate "h" "a" >>= exact

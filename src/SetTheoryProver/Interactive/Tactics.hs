@@ -30,6 +30,7 @@ module SetTheoryProver.Interactive.Tactics
   , focus
   , generalising
   , transport
+  , instantiate
   , exists
   ) where
 
@@ -491,6 +492,14 @@ transport term instantiateFormula = do
             in constructProof state (p':ps)
     }
 
+instantiate :: LC -> Term -> TacticM LC
+instantiate lambdaProof term = do
+  asms <- getAssumptions
+  case inferType asms lambdaProof of
+    Left err -> fail ("instantiate: failed to infer type of lambda term (error: '" ++ err ++ "')")
+    Right (Forall x phi) -> pure (LCPrf (ax5 x term phi) :@ lambdaProof)
+    Right _ -> fail "instantiate: expected type of lambda term to be of the form 'Forall x phi'"
+
 exists :: Term -> Tactic
 exists term = do
   state <- get
@@ -515,7 +524,6 @@ exists term = do
 
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
--- TODO: tactic for instantiation of forall
 -- TODO: ex falso tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
