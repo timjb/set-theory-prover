@@ -30,6 +30,7 @@ module SetTheoryProver.Interactive.Tactics
   , focus
   , generalising
   , transport
+  , exists
   ) where
 
 import Prelude hiding (repeat)
@@ -490,10 +491,31 @@ transport term instantiateFormula = do
             in constructProof state (p':ps)
     }
 
+exists :: Term -> Tactic
+exists term = do
+  state <- get
+  (asms, x, phi, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "exists: no goals"
+      Subgoal { assumptions = asms, claim = Exists x phi } : otherSubgoals -> pure (asms, x, phi, otherSubgoals)
+      _:_ -> fail "exists: goal is not of the form 'Exists x phi'"
+  let
+    z = freshVar (foldl varUnion (fvInFormula phi) (map (fvInFormula . snd) asms))
+    phiTemplate = replaceInFormula x (Var z) phi
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms, claim = replaceInFormula x term phi } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "exists: expected to get at least one proof"
+          p:ps ->
+            let p' = LCPrf (ax5 z term (phiTemplate :=>: Exists x phi)) :@ LCForall z (LCPrf (existsIntro z x phiTemplate)) :@ p
+            in constructProof state (p':ps)
+    }
+
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
 -- TODO: tactic for instantiation of forall
--- TODO: tactic for existential introduction
 -- TODO: ex falso tactic
 -- TODO: auto tactic
 -- TODO: admit tactic

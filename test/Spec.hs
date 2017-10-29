@@ -5,6 +5,7 @@ module Main (main) where
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive.TacticMonad
 import SetTheoryProver.Interactive.Tactics
+import SetTheoryProver.Lib.Logic
 
 import Data.Either (isLeft)
 import Control.Monad (unless)
@@ -89,6 +90,15 @@ proofWithGeneralising =
     refl
     assumption "phi"
 
+proofWithExists :: Test
+proofWithExists =
+  checkTacticProof ("x" :€: "s" :=>: Exists "z" ("z" :€: "s" :/\: truth)) $ do
+    intro "phi"
+    exists "x"
+    split
+    someAssumption
+    exact truthIsTrue
+
 incompleteProof :: Test
 incompleteProof = checkNoTacticProof "there are open subgoals" truth (pure ())
 
@@ -108,6 +118,7 @@ main = do
     , proofWithContraposition
     , proofWithHave
     , proofWithGeneralising
+    , proofWithExists
     , incompleteProof
     , wrongAssumptionName
     ]

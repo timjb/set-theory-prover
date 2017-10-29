@@ -45,6 +45,7 @@ module SetTheoryProver.Lib.Logic
     -- * Properties of =
   , symmetry
   , transitivity
+    -- * Properties relating ∀ and ∃
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)

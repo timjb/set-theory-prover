@@ -167,7 +167,7 @@ orIntroLeft phi psi = axiom (phi :=>: phi :\/: psi)
 orIntroRight :: Formula -> Formula -> Proof
 orIntroRight phi psi = axiom (psi :=>: phi :\/: psi)
 
--- | Axiom schema 'φ ⇒ ∃y. φ[x := y]'
+-- | Axiom schema 'φ ⇒ ∃y. φ[x := y]' if y is not free in φ
 existsIntro :: VarName -> VarName -> Formula -> Proof
 existsIntro x y phi =
   if y `elem` fvInFormula phi then
