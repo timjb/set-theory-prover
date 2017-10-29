@@ -31,6 +31,7 @@ module SetTheoryProver.Core.Axioms
   , orIntroRight
   , orElim
   -- ** Axioms for ∃ and ∀
+  , existsIntro
   , existsElim
   -- * ZFC axioms
   , extensionalityAxiom
@@ -166,7 +167,15 @@ orIntroLeft phi psi = axiom (phi :=>: phi :\/: psi)
 orIntroRight :: Formula -> Formula -> Proof
 orIntroRight phi psi = axiom (psi :=>: phi :\/: psi)
 
--- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∃x. φ) ⇒ ψ'
+-- | Axiom schema 'φ ⇒ ∃y. φ[x := y]'
+existsIntro :: VarName -> VarName -> Formula -> Proof
+existsIntro x y phi =
+  if y `elem` fvInFormula phi then
+    error "existsIntro: variable capture!"
+  else
+    axiom (phi :=>: Exists y (replaceInFormula x (Var y) phi))
+
+-- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∃x. φ) ⇒ ψ' if x is not free in ψ
 existsElim :: VarName -> Formula -> Formula -> Proof
 existsElim x phi psi =
   if x `elem` fvInFormula psi then
