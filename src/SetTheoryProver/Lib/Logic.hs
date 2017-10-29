@@ -44,6 +44,7 @@ module SetTheoryProver.Lib.Logic
   , lem
     -- * Properties of =
   , symmetry
+  , transitivity
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)
@@ -531,3 +532,14 @@ symmetry s t =
     intro "s=t"
     transport "s=t" (\z -> z :=: s)
     refl
+
+-- | Schema 's = t ⇒ t = u ⇒ s = u'
+--
+-- >>> checkProof (transitivity (Var "x") (Var "y") (Var "z"))
+transitivity :: Term -> Term -> Term -> Proof
+transitivity s t u =
+  prove (s :=: t :=>: t :=: u :=>: s :=: u) $ do
+    intro "s=t"
+    intro "t=u"
+    transport "t=u" (\r -> s :=: r)
+    assumption "s=t"
