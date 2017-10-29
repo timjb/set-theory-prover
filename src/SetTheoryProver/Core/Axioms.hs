@@ -23,15 +23,15 @@ module SetTheoryProver.Core.Axioms
   , ax8
   , ax9
   -- ** Axioms for ∧
-  , and_intro
-  , and_elim1
-  , and_elim2
+  , andIntro
+  , andElimLeft
+  , andElimRight
   -- ** Axioms for ∨
-  , or_intro1
-  , or_intro2
-  , or_elim
+  , orIntroLeft
+  , orIntroRight
+  , orElim
   -- ** Axioms for ∃ and ∀
-  , exists_elim
+  , existsElim
   -- * ZFC axioms
   , extensionalityAxiom
   , regularityAxiom
@@ -143,34 +143,34 @@ ax9 s t x phi = axiom (antecedent :=>: consequent)
     consequent = replaceInFormula x s phi :=>: replaceInFormula x t phi
 
 -- | Axiom schema 'φ ⇒ (ψ ⇒ φ ∧ ψ)'
-and_intro :: Formula -> Formula -> Proof
-and_intro phi psi = axiom (phi :=>: psi :=>: phi :/\: psi)
+andIntro :: Formula -> Formula -> Proof
+andIntro phi psi = axiom (phi :=>: psi :=>: phi :/\: psi)
 
 -- | Axiom schema 'φ ∧ ψ ⇒ φ'
-and_elim1 :: Formula -> Formula -> Proof
-and_elim1 phi psi = axiom (phi :/\: psi :=>: phi)
+andElimLeft :: Formula -> Formula -> Proof
+andElimLeft phi psi = axiom (phi :/\: psi :=>: phi)
 
 -- | Axiom schema 'φ ∧ ψ ⇒ ψ'
-and_elim2 :: Formula -> Formula -> Proof
-and_elim2 phi psi = axiom (phi :/\: psi :=>: psi)
+andElimRight :: Formula -> Formula -> Proof
+andElimRight phi psi = axiom (phi :/\: psi :=>: psi)
 
 -- | Axiom schema '(φ ⇒ ξ) ⇒ (ψ ⇒ ξ) ⇒ (φ ∨ ψ ⇒ ξ)'
-or_elim :: Formula -> Formula -> Formula -> Proof
-or_elim phi psi xi = axiom ((phi :=>: xi) :=>: (psi :=>: xi) :=>: phi :\/: psi :=>: xi)
+orElim :: Formula -> Formula -> Formula -> Proof
+orElim phi psi xi = axiom ((phi :=>: xi) :=>: (psi :=>: xi) :=>: phi :\/: psi :=>: xi)
 
 -- | Axiom schema 'φ ⇒ φ ∨ ψ'
-or_intro1 :: Formula -> Formula -> Proof
-or_intro1 phi psi = axiom (phi :=>: phi :\/: psi)
+orIntroLeft :: Formula -> Formula -> Proof
+orIntroLeft phi psi = axiom (phi :=>: phi :\/: psi)
 
 -- | Axiom schema 'ψ ⇒ φ ∨ ψ'
-or_intro2 :: Formula -> Formula -> Proof
-or_intro2 phi psi = axiom (psi :=>: phi :\/: psi)
+orIntroRight :: Formula -> Formula -> Proof
+orIntroRight phi psi = axiom (psi :=>: phi :\/: psi)
 
 -- | Axiom schema '(∀x. φ ⇒ ψ) ⇒ (∃x. φ) ⇒ ψ'
-exists_elim :: VarName -> Formula -> Formula -> Proof
-exists_elim x phi psi =
+existsElim :: VarName -> Formula -> Formula -> Proof
+existsElim x phi psi =
   if x `elem` fvInFormula psi then
-    error "exists_elim: variable must not occur freely in second formula"
+    error "existsElim: variable must not occur freely in second formula"
   else
     axiom (Forall x (phi :=>: psi) :=>: (Exists x phi) :=>: psi)
 

@@ -137,7 +137,7 @@ split = do
     , constructProof =
         \case
           phiProof:psiProof:otherProofs ->
-            let phiAndPsiProof = LCPrf (and_intro phi psi) :@ phiProof :@ psiProof
+            let phiAndPsiProof = LCPrf (andIntro phi psi) :@ phiProof :@ psiProof
             in constructProof state (phiAndPsiProof:otherProofs)
           _ -> error "split: expected to get proofs for two subgoals (corresponding to the two conjuncts)"
     }
@@ -157,7 +157,7 @@ left = do
         \case
           [] -> error "left: expected to get proof of at least one subgoal (corresponding to the left disjunct)"
           phiProof:otherProofs ->
-            let phiOrPsiProof = LCPrf (or_intro1 phi psi) :@ phiProof
+            let phiOrPsiProof = LCPrf (orIntroLeft phi psi) :@ phiProof
             in constructProof state (phiOrPsiProof:otherProofs)
     }
 
@@ -176,7 +176,7 @@ right = do
         \case
           [] -> error "right: expected to get proof of at least one subgoal (corresponding to the right disjunct)"
           psiProof:otherProofs ->
-            let phiOrPsiProof = LCPrf (or_intro2 phi psi) :@ psiProof
+            let phiOrPsiProof = LCPrf (orIntroRight phi psi) :@ psiProof
             in constructProof state (phiOrPsiProof:otherProofs)
     }
 
@@ -292,7 +292,7 @@ cases nameDisjunction nameLeftDisjunct nameRightDisjunct = do
           subgoalProofWithPhi:subgoalProofWithPsi:otherProofs ->
             let
               subgoalProof =
-                LCPrf (or_elim phi psi target)
+                LCPrf (orElim phi psi target)
                   :@ (nameLeftDisjunct ::: phi :-> subgoalProofWithPhi)
                   :@ (nameRightDisjunct ::: psi :-> subgoalProofWithPsi)
                   :@ (LCVar nameDisjunction)
@@ -328,8 +328,8 @@ destruct asmName leftAsmName rightAsmName = do
             let
               subgoalProof =
                 (leftAsmName ::: phi :-> rightAsmName ::: psi :-> subgoalProof')
-                  :@ (LCPrf (and_elim1 phi psi) :@ LCVar asmName)
-                  :@ (LCPrf (and_elim2 phi psi) :@ LCVar asmName)
+                  :@ (LCPrf (andElimLeft phi psi) :@ LCVar asmName)
+                  :@ (LCPrf (andElimRight phi psi) :@ LCVar asmName)
             in
               constructProof state (subgoalProof:otherProofs)
     }
