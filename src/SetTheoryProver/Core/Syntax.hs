@@ -87,7 +87,11 @@ replaceInTerm' x s fvInS t =
     DefDescr y g -> DefDescr y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
 
 replaceInTerm :: VarName -> Term -> Term -> Term
-replaceInTerm x s = replaceInTerm' x s (fvInTerm s)
+replaceInTerm x s =
+  if s == Var x then
+    id -- optimization
+  else
+    replaceInTerm' x s (fvInTerm s)
 
 data Formula
   -- First-order logic (with equality)
@@ -215,7 +219,11 @@ replaceInFormula' x s fvInS f =
     recurseTerm = replaceInTerm' x s fvInS
 
 replaceInFormula :: VarName -> Term -> Formula -> Formula
-replaceInFormula x s = replaceInFormula' x s (fvInTerm s)
+replaceInFormula x s =
+  if s == Var x then
+    id -- optimization
+  else
+    replaceInFormula' x s (fvInTerm s)
 
 -- TODO: move into other module?
 varSource :: [VarName]

@@ -47,6 +47,9 @@ module SetTheoryProver.Lib.Logic
   , transitivity
     -- * Properties relating ∀ and ∃
   , forallImpliesExists
+  , negForall1
+  , negForall2
+  , negForall
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)
@@ -555,3 +558,46 @@ forallImpliesExists x phi =
     intro "h"
     exists "a"
     instantiate "h" "a" >>= exact
+
+-- | Schema '¬(∀x. φ) ⇒ ∃x. ¬φ'
+--
+-- >>> checkProof (negForall1 "x" phi)
+negForall1 :: VarName -> Formula -> Proof
+negForall1 x phi =
+  prove (Neg (Forall x phi) :=>: Exists x (Neg phi)) $ do
+    contraposition
+    intro "negExistsXWithNegPhi"
+    applyProof (negNegIntroduction (Forall x phi))
+    generalising
+    have "lem" (phi :\/: Neg phi) from (lem phi)
+    cases "lem" "phi" "negPhi" >> assumption "phi"
+    have "existsXWithNegPhi" (Exists x (Neg phi)) by $ do
+      exists (Var x)
+      someAssumption
+    applyProof (exFalso phi)
+    exact (LCPrf (contradiction (Exists x (Neg phi))) :@ "negExistsXWithNegPhi" :@ "existsXWithNegPhi")
+
+-- | Schema '(∃x. ¬φ) ⇒ ¬(∀x. φ)'
+--
+-- >>> checkProof (negForall2 "x" phi)
+negForall2 :: VarName -> Formula -> Proof
+negForall2 x phi =
+  prove (Exists x (Neg phi) :=>: Neg (Forall x phi)) $ do
+    intro "existsXWithNegPhi"
+    applyProof (negCharacterisation' (Forall x phi))
+    intro "forallXPhi"
+    elimExists "y" "existsXWithNegPhi" -- TODO: make sure y appears nowhere else
+    phiHoldsForY <- instantiate "forallXPhi" (Var "y")
+    exact (LCPrf (contradiction (replaceInFormula x (Var "y") phi)) :@ "existsXWithNegPhi" :@ phiHoldsForY)
+
+-- | Schema '¬(∀x. φ) ⇔ ∃x. ¬φ'
+--
+-- >>> checkProof (negForall "x" phi)
+negForall :: VarName -> Formula -> Proof
+negForall x phi =
+  prove (Neg (Forall x phi) `iff` Exists x (Neg phi)) $ do
+    split
+    exact (negForall1 x phi)
+    exact (negForall2 x phi)
+
+-- TODO: '¬(∃x. φ) ⇔ ∀x. ¬φ'

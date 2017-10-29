@@ -32,6 +32,7 @@ module SetTheoryProver.Interactive.Tactics
   , transport
   , instantiate
   , exists
+  , elimExists
   ) where
 
 import Prelude hiding (repeat)
@@ -522,8 +523,65 @@ exists term = do
             in constructProof state (p':ps)
     }
 
+renameExistentialQuantifier :: VarName -> Formula -> VarName -> Formula -> LC -> LC
+renameExistentialQuantifier x phi y phi' lambdaTerm =
+  -- Precondition: phi' is phi with x replaced by y
+  if x == y then
+    lambdaTerm
+  else
+    LCPrf (existsElim x phi (Exists y phi'))
+      :@ LCForall x (LCPrf (existsIntro x y phi))
+      :@ lambdaTerm
+
+elimExists :: VarName -> String -> Tactic
+elimExists y asmName = do
+  state <- get
+  (Subgoal { assumptions = asms, claim = target }, otherSubgoals) <-
+    case currentGoals state of
+      [] -> fail "elimExists: no goals"
+      subgoal:otherSubgoals -> pure (subgoal, otherSubgoals)
+  (x, phi) <-
+    case lookup asmName asms of
+      Nothing -> fail ("elimExists: '" ++ asmName ++ "' is not an assumption")
+      Just (Exists x phi) -> pure (x, phi)
+      Just _ -> fail ("elimExists: expected assumption '" ++ asmName ++ "' to be of the form 'Exists x phi'")
+  when (y `elem` fvInFormula target) $
+    fail ("elimExists: variable '" ++ y ++ "' occurs in target '" ++ show target ++ "'!")
+  forM_ asms $ \(name, formula) ->
+    when (y `elem` fvInFormula formula) $
+      fail ("elimExists: variable '" ++ y ++ "' occurs in assumption '" ++ name ++ "'!")
+  let
+    phi' = replaceInFormula x (Var y) phi
+    asms' = set asmName phi' asms
+  put $
+    state
+    { currentGoals = Subgoal { assumptions = asms', claim = target } : otherSubgoals
+    , constructProof =
+        \case
+          [] -> error "elimExists: expected to get at least one proof"
+          p:ps ->
+            let
+              p' =
+                LCPrf (existsElim y phi' target)
+                  :@ LCForall y (LCAbs (asmName, phi') p)
+                  :@ renameExistentialQuantifier x phi y phi' (LCVar asmName)
+            in
+              constructProof state (p':ps)
+    }
+  where
+    set :: Eq k => k -> v -> [(k,v)] -> [(k,v)]
+    set key val pairs =
+      case pairs of
+        [] -> [(key,val)]
+        (key1,val1):otherPairs ->
+          if key1 == key then
+            (key,val):otherPairs
+          else
+            (key1,val1) : set key val otherPairs
+
 -- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
 -- TODO: ex falso tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
+-- TODO: contradiction tactic
