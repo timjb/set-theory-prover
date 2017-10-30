@@ -284,29 +284,31 @@ orDistributesOverAnd phi psi xi =
   prove ((phi :\/: (psi :/\: xi)) `iff` ((phi :\/: psi) :/\: (phi :\/: xi))) $ do
     split
     -- =>
-    intro "phiOrPsiAndXi"
-    cases "phiOrPsiAndXi" "phi" "psiAndXi"
-    -- first case
-    split >> repeat_ (left >> assumption "phi")
-    -- second case
-    destruct "psiAndXi" "psi" "xi"
-    split
-    repeat_ (right >> someAssumption)
+    weShow (phi :\/: (psi :/\: xi) :=>: (phi :\/: psi) :/\: (phi :\/: xi)) by $ do
+      intro "phiOrPsiAndXi"
+      cases "phiOrPsiAndXi" "phi" "psiAndXi"
+      -- first case
+      split >> repeat_ (left >> assumption "phi")
+      -- second case
+      destruct "psiAndXi" "psi" "xi"
+      split
+      repeat_ (right >> someAssumption)
     -- <=
-    intro "h"
-    destruct "h" "phiOrPsi" "phiOrXi"
-    cases "phiOrPsi" "phi" "psi"
-    -- first case
-    left >> assumption "phi"
-    -- second case
-    cases "phiOrXi" "phi" "xi"
-    -- first subcase (of second case)
-    left >> assumption "phi"
-    -- second subcase (of second case)
-    right
-    split
-    assumption "psi"
-    assumption "xi"
+    weShow ((phi :\/: psi) :/\: (phi :\/: xi) :=>: phi :\/: (psi :/\: xi)) by $ do
+      intro "h"
+      destruct "h" "phiOrPsi" "phiOrXi"
+      cases "phiOrPsi" "phi" "psi"
+      -- first case
+      left >> assumption "phi"
+      -- second case
+      cases "phiOrXi" "phi" "xi"
+      -- first subcase (of second case)
+      left >> assumption "phi"
+      -- second subcase (of second case)
+      right
+      split
+      assumption "psi"
+      assumption "xi"
 
 -- | Schema '¬φ ⇒ φ ⇒ ⊥'
 --

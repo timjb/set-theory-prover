@@ -33,6 +33,7 @@ module SetTheoryProver.Interactive.Tactics
   , instantiate
   , exists
   , elimExists
+  , weShow
   ) where
 
 import Prelude hiding (repeat)
@@ -449,6 +450,14 @@ focus script = do
     logMsg ("focus: tactic did not fully solve subgoal '" ++ show (claim subgoal) ++ "'")
   pure res
 
+-- | Tactic for structuring proofs
+weShow :: Formula -> (a -> Tactic) -> a -> Tactic
+weShow phi toTactic tacticLike = do
+  subgoal <- getSubgoal
+  when (phi /= claim subgoal) $
+    fail "weShow: claimed goal does not match real goal!"
+  focus (toTactic tacticLike)
+
 generalising :: Tactic
 generalising = do
   state <- get
@@ -579,9 +588,6 @@ elimExists y asmName = do
           else
             (key1,val1) : set key val otherPairs
 
--- TODO: 'remainsToShow' tactic
 -- TODO: rewrite tactic
--- TODO: ex falso tactic
 -- TODO: auto tactic
 -- TODO: admit tactic
--- TODO: contradiction tactic
