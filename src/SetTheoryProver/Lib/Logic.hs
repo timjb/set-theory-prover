@@ -54,6 +54,9 @@ module SetTheoryProver.Lib.Logic
   , negForall1
   , negForall2
   , negForall
+  , negExists1
+  , negExists2
+  , negExists
   ) where
 
 import Prelude hiding (repeat, curry, uncurry)
@@ -609,4 +612,38 @@ negForall x phi =
     exact (negForall1 x phi)
     exact (negForall2 x phi)
 
--- TODO: '¬(∃x. φ) ⇔ ∀x. ¬φ'
+-- | Schema '¬(∃x. φ) ⇒ ∀x. ¬φ' (constructive)
+--
+-- >>> checkProof (negExists1 "x" phi)
+negExists1 :: VarName -> Formula -> Proof
+negExists1 x phi =
+  prove (Neg (Exists x phi) :=>: Forall x (Neg phi)) $ do
+    intro "negExistsXWithPhi"
+    generalising
+    negIntro "phi"
+    suffices "existsXWithPhi" (Exists x phi) by $
+      exact (LCPrf (contradiction (Exists x phi)) :@ "negExistsXWithPhi" :@ "existsXWithPhi")
+    exists (Var x)
+    assumption "phi"
+
+-- | Schema '∀x. ¬φ ⇒ ¬(∃x. φ)'
+--
+-- >>> checkProof (negExists2 "x" phi)
+negExists2 :: VarName -> Formula -> Proof
+negExists2 x phi =
+  prove (Forall x (Neg phi) :=>: Neg (Exists x phi)) $ do
+    intro "forallXNegPhi"
+    negIntro "existsXPhi"
+    elimExists x "existsXPhi"
+    negPhi <- instantiate "forallXNegPhi" (Var x)
+    exact (LCPrf (contradiction phi) :@ negPhi :@ "existsXPhi")
+
+-- | Schema '¬(∃x. φ) ⇔ ∀x. ¬φ'
+--
+-- >>> checkProof (negExists "x" phi)
+negExists :: VarName -> Formula -> Proof
+negExists x phi =
+  prove (Neg (Exists x phi) `iff` Forall x (Neg phi)) $ do
+    split
+    exact (negExists1 x phi)
+    exact (negExists2 x phi)
