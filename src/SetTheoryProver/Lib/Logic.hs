@@ -37,6 +37,7 @@ module SetTheoryProver.Lib.Logic
     -- ** Tactics
   , negIntro
   , assumeTheContrary
+  , haveContradiction
     -- * De Morgan's laws
   , deMorgan1a, deMorgan1b, deMorgan1
   , deMorgan2a, deMorgan2b, deMorgan2
@@ -63,6 +64,8 @@ import Prelude hiding (repeat, curry, uncurry)
 
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive
+
+import Control.Monad (when)
 
 -- $setup
 -- >>> let phi = Var "x" :€: Var "s"
@@ -409,6 +412,24 @@ assumeTheContrary asmName = do
   applyProof (negNegElimination (claim subgoal))
   negIntro asmName
 
+haveContradiction :: LC -> LC -> Tactic
+haveContradiction lambdaTerm1 lambdaTerm2 = do
+  asms <- getAssumptions
+  (phi, negatedTerm, positiveTerm) <-
+    case (inferType asms lambdaTerm1, inferType asms lambdaTerm2) of
+      (Left err, _) -> fail ("haveContradiction: could not infer type of first argument (error: '" ++ err ++ "')")
+      (_, Left err) -> fail ("haveContradiction: could not infer type of second argument (error: '" ++ err ++ "')")
+      (Right (Neg phi), Right phi') | phi == phi' -> pure (phi, lambdaTerm1, lambdaTerm2)
+      (Right phi, Right (Neg phi'))  | phi == phi' -> pure (phi, lambdaTerm2, lambdaTerm1)
+      (Right phi, Right phi') ->
+        fail
+          ("haveContradiction: expected one of the formulas '" ++ show phi ++ "' and '" ++ show phi'
+           ++ "' to be the negation of the other.")
+  subgoal <- getSubgoal
+  when (claim subgoal /= falsity) $
+    applyProof (exFalso (claim subgoal))
+  exact (LCPrf (contradiction phi) :@ negatedTerm :@ positiveTerm)
+
 -- | Schema '¬(φ ∧ ψ) ⇒ ¬φ ∨ ¬ψ'
 --
 -- >>> checkProof (deMorgan1a phi psi)
@@ -435,8 +456,8 @@ deMorgan1b phi psi =
     negIntro "phiAndPsi"
     destruct "phiAndPsi" "phi" "psi" >> clear "phiAndPsi"
     cases "negPhiOrNegPsi" "negPhi" "negPsi"
-    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
-    exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")
+    haveContradiction "negPhi" "phi"
+    haveContradiction "negPsi" "psi"
 
 -- | Schema '¬(φ ∧ ψ) ⇔ ¬φ ∨ ¬ψ'
 --
@@ -458,14 +479,12 @@ deMorgan2a phi psi =
     split
     -- left conjunct
     negIntro "phi"
-    apply (LCPrf (contradiction (phi :\/: psi)) :@ "negPhiOrPsi")
-    left
-    assumption "phi"
+    have "phiOrPsi" (phi :\/: psi) by (left >> assumption "phi")
+    haveContradiction "negPhiOrPsi" "phiOrPsi"
     -- right conjunct
     negIntro "psi"
-    apply (LCPrf (contradiction (phi :\/: psi)) :@ "negPhiOrPsi")
-    right
-    assumption "psi"
+    have "phiOrPsi" (phi :\/: psi) by (right >> assumption "psi")
+    haveContradiction "negPhiOrPsi" "phiOrPsi"
 
 -- | Schema '¬(φ ∨ ψ) ⇒ ¬φ ∧ ¬ψ'
 --
@@ -477,8 +496,8 @@ deMorgan2b phi psi =
     destruct "negPhiAndNegPsi" "negPhi" "negPsi"
     negIntro "phiOrPsi"
     cases "phiOrPsi" "phi" "psi"
-    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
-    exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")
+    haveContradiction "negPhi" "phi"
+    haveContradiction "negPsi" "psi"
 
 -- | Schema '¬(φ ∨ ψ) ⇔ ¬φ ∧ ¬ψ'
 --
@@ -511,8 +530,7 @@ implicationOr2 phi psi =
     intros ["negPhiOrPsi", "phi"]
     cases "negPhiOrPsi" "negPhi" "psi"
     -- first case
-    applyProof (exFalso psi)
-    exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
+    haveContradiction "negPhi" "phi"
     -- second case
     assumption "psi"
 
@@ -535,11 +553,11 @@ lem phi =
     assumeTheContrary "negPhiOrNegPhi"
     -- from here on, the proof is constructive
     suffices "phiOrNegPhi" (phi :\/: Neg phi) by $
-      exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
+      haveContradiction "negPhiOrNegPhi" "phiOrNegPhi"
     right
     negIntro "phi"
     have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
-    exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
+    haveContradiction "negPhiOrNegPhi" "phiOrNegPhi"
 
 -- | Schema 's = t ⇒ t = s'
 --
@@ -582,13 +600,11 @@ negForall1 x phi =
     intro "negExistsXWithNegPhi"
     applyProof (negNegIntroduction (Forall x phi))
     generalising
-    have "lem" (phi :\/: Neg phi) from (lem phi)
-    cases "lem" "phi" "negPhi" >> assumption "phi"
+    assumeTheContrary "negPhi"
     have "existsXWithNegPhi" (Exists x (Neg phi)) by $ do
       exists (Var x)
       someAssumption
-    applyProof (exFalso phi)
-    exact (LCPrf (contradiction (Exists x (Neg phi))) :@ "negExistsXWithNegPhi" :@ "existsXWithNegPhi")
+    haveContradiction "negExistsXWithNegPhi" "existsXWithNegPhi"
 
 -- | Schema '(∃x. ¬φ) ⇒ ¬(∀x. φ)'
 --
@@ -600,7 +616,7 @@ negForall2 x phi =
     negIntro "forallXPhi"
     elimExists "y" "existsXWithNegPhi" -- TODO: make sure y appears nowhere else
     phiHoldsForY <- instantiate "forallXPhi" (Var "y")
-    exact (LCPrf (contradiction (replaceInFormula x (Var "y") phi)) :@ "existsXWithNegPhi" :@ phiHoldsForY)
+    haveContradiction "existsXWithNegPhi" phiHoldsForY
 
 -- | Schema '¬(∀x. φ) ⇔ ∃x. ¬φ'
 --
@@ -622,7 +638,7 @@ negExists1 x phi =
     generalising
     negIntro "phi"
     suffices "existsXWithPhi" (Exists x phi) by $
-      exact (LCPrf (contradiction (Exists x phi)) :@ "negExistsXWithPhi" :@ "existsXWithPhi")
+      haveContradiction "negExistsXWithPhi" "existsXWithPhi"
     exists (Var x)
     assumption "phi"
 
@@ -636,7 +652,7 @@ negExists2 x phi =
     negIntro "existsXPhi"
     elimExists x "existsXPhi"
     negPhi <- instantiate "forallXNegPhi" (Var x)
-    exact (LCPrf (contradiction phi) :@ negPhi :@ "existsXPhi")
+    haveContradiction negPhi "existsXPhi"
 
 -- | Schema '¬(∃x. φ) ⇔ ∀x. ¬φ'
 --
