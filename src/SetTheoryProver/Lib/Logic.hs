@@ -23,16 +23,20 @@ module SetTheoryProver.Lib.Logic
   , orDistributesOverAnd
     -- * Properties of ⊤
   , truthIsTrue
-    -- * Properties of ⊥
+    -- * Properties of ¬ and ⊥
+    -- ** Properties of ⊥
   , exFalso
-    -- * Properties relating ⊥ and ¬
+    -- ** Properties relating ⊥ and ¬
   , contradiction
   , negCharacterisation'
   , negCharacterisation
-    -- * Properties of ¬
+    -- ** Properties of ¬
   , negNegElimination
   , negNegIntroduction
   , contrapositionConverse
+    -- ** Tactics
+  , negIntro
+  , assumeTheContrary
     -- * De Morgan's laws
   , deMorgan1a, deMorgan1b, deMorgan1
   , deMorgan2a, deMorgan2b, deMorgan2
@@ -385,9 +389,22 @@ exFalso phi =
     applyProof (negNegIntroduction truth)
     exact truthIsTrue
 
---assumeTheContrary :: Tactic
---assumeTheContrary = do
---  Subgoal { claim = target } <- getSubgoal
+-- | Tactic: To prove ¬φ, assume φ and show ⊥. Constructively valid.
+negIntro :: String -> Tactic
+negIntro asmName = do
+  subgoal <- getSubgoal
+  case claim subgoal of
+    Neg phi -> do
+      applyProof (negCharacterisation' phi)
+      intro asmName
+    _ -> fail "negIntro: target is not of the form 'Neg phi'"
+
+-- | Tactic: To prove φ, assume ¬φ and show ⊥. Classical logic!
+assumeTheContrary :: String -> Tactic
+assumeTheContrary asmName = do
+  subgoal <- getSubgoal
+  applyProof (negNegElimination (claim subgoal))
+  negIntro asmName
 
 -- | Schema '¬(φ ∧ ψ) ⇒ ¬φ ∨ ¬ψ'
 --
@@ -412,8 +429,7 @@ deMorgan1b :: Formula -> Formula -> Proof
 deMorgan1b phi psi =
   prove (Neg phi :\/: Neg psi :=>: Neg (phi :/\: psi)) $ do
     intro "negPhiOrNegPsi"
-    applyProof (negCharacterisation' (phi :/\: psi))
-    intro "phiAndPsi"
+    negIntro "phiAndPsi"
     destruct "phiAndPsi" "phi" "psi" >> clear "phiAndPsi"
     cases "negPhiOrNegPsi" "negPhi" "negPsi"
     exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
@@ -438,14 +454,12 @@ deMorgan2a phi psi =
     intro "negPhiOrPsi"
     split
     -- left conjunct
-    applyProof (negCharacterisation' phi)
-    intro "phi"
+    negIntro "phi"
     apply (LCPrf (contradiction (phi :\/: psi)) :@ "negPhiOrPsi")
     left
     assumption "phi"
     -- right conjunct
-    applyProof (negCharacterisation' psi)
-    intro "psi"
+    negIntro "psi"
     apply (LCPrf (contradiction (phi :\/: psi)) :@ "negPhiOrPsi")
     right
     assumption "psi"
@@ -458,8 +472,7 @@ deMorgan2b phi psi =
   prove (Neg phi :/\: Neg psi :=>: Neg (phi :\/: psi)) $ do
     intro "negPhiAndNegPsi"
     destruct "negPhiAndNegPsi" "negPhi" "negPsi"
-    applyProof (negCharacterisation' (phi :\/: psi))
-    intro "phiOrPsi"
+    negIntro "phiOrPsi"
     cases "phiOrPsi" "phi" "psi"
     exact (LCPrf (contradiction phi) :@ "negPhi" :@ "phi")
     exact (LCPrf (contradiction psi) :@ "negPsi" :@ "psi")
@@ -516,15 +529,12 @@ implicationOr phi psi =
 lem :: Formula -> Proof
 lem phi =
   prove (phi :\/: Neg phi) $ do
-    applyProof (negNegElimination (phi :\/: Neg phi))
+    assumeTheContrary "negPhiOrNegPhi"
     -- from here on, the proof is constructive
-    applyProof (negCharacterisation' (Neg (phi :\/: Neg phi)))
-    intro "negPhiOrNegPhi"
     suffices "phiOrNegPhi" (phi :\/: Neg phi) by $
       exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
     right
-    applyProof (negCharacterisation' phi)
-    intro "phi"
+    negIntro "phi"
     have "phiOrNegPhi" (phi :\/: Neg phi) by (left >> assumption "phi")
     exact (LCPrf (contradiction (phi :\/: Neg phi)) :@ "negPhiOrNegPhi" :@ "phiOrNegPhi")
 
@@ -584,8 +594,7 @@ negForall2 :: VarName -> Formula -> Proof
 negForall2 x phi =
   prove (Exists x (Neg phi) :=>: Neg (Forall x phi)) $ do
     intro "existsXWithNegPhi"
-    applyProof (negCharacterisation' (Forall x phi))
-    intro "forallXPhi"
+    negIntro "forallXPhi"
     elimExists "y" "existsXWithNegPhi" -- TODO: make sure y appears nowhere else
     phiHoldsForY <- instantiate "forallXPhi" (Var "y")
     exact (LCPrf (contradiction (replaceInFormula x (Var "y") phi)) :@ "existsXWithNegPhi" :@ phiHoldsForY)
