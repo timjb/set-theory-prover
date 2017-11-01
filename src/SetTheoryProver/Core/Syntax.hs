@@ -1,12 +1,13 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module SetTheoryProver.Core.Syntax
   ( VarName
   , Ctx
   , Term (..)
-  , Formula (.., (:=>:), (:\/:), (:/\:), (:=:), (:€:))
+  , Formula ((:=>:), (:\/:), (:/\:), (:=:), (:€:), Neg, Forall, Exists)
   -- * Variable management
   , varUnion
   , freshVar
@@ -69,8 +70,6 @@ instance Show Term where
           ("(" ++) . showsFn . (")" ++)
         else
           showsFn
-    where
-      appPrec = 10
 
 fvInTerm :: Term -> [VarName]
 fvInTerm (Var x) = [x]
@@ -98,31 +97,47 @@ data Formula
   = Implies Formula Formula -- ^ implication
   | And Formula Formula -- ^ conjunction
   | Or Formula Formula -- ^ disjunction
-  | Neg Formula -- ^ negation
+  | Neg' Formula -- ^ negation
   | Eq Term Term -- ^ equality
-  | Forall VarName Formula -- ^ universal quantification
-  | Exists VarName Formula -- ^ existential quantification
+  | Forall' VarName Formula -- ^ universal quantification
+  | Exists' VarName Formula -- ^ existential quantification
   -- Set-theory
   | Elem Term Term -- ^ Element relation
-  deriving (Eq, Generic, NFData)
+  -- Abbreviation
+  | Abbrev (Int -> ShowS) Formula
+  deriving (Generic, NFData)
+
+instance Eq Formula where
+  Abbrev  _  f  == g             = f == g
+  f             == Abbrev  _  g  = f == g
+  Implies f1 f2 == Implies g1 g2 = f1 == g1 && f2 == g2
+  And     f1 f2 == And     g1 g2 = f1 == g1 && f2 == g2
+  Or      f1 f2 == Or      g1 g2 = f1 == g1 && f2 == g2
+  Neg'    f     == Neg'    g     = f == g
+  Eq      s1 s2 == Eq      t1 t2 = s1 == t1 && s2 == t2
+  Forall' x  f  == Forall' y  g  = x == y && f == g
+  Exists' x  f  == Exists' y  g  = x == y && f == g
+  Elem    x1 x2 == Elem    y1 y2 = x1 == y1 && x2 == y2
+  _             == _          = False
 
 instance Show Formula where
   showsPrec ctxPrec formula =
     case formula of
       Implies phi psi ->
         let showsPsi = case psi of { Implies _ _ -> showsPrec 0; _ -> showsPrec' impliesPrec }
-        in parenthesise impliesPrec $ showsPrec' impliesPrec phi . (" :=>: " ++) . showsPsi psi
+        in parenthesise ctxPrec impliesPrec $ showsPrec' impliesPrec phi . (" :=>: " ++) . showsPsi psi
       And phi psi ->
         let showsPsi = case psi of { And _ _ -> showsPrec 0; _ -> showsPrec' andPrec }
-        in parenthesise andPrec (showsPrec' andPrec phi . (" :/\\: " ++) . showsPsi psi)
+        in parenthesise ctxPrec andPrec (showsPrec' andPrec phi . (" :/\\: " ++) . showsPsi psi)
       Or phi psi ->
         let showsPsi = case psi of { Or _ _ -> showsPrec 0; _ -> showsPrec' orPrec }
-        in parenthesise orPrec (showsPrec' orPrec phi . (" :\\/: " ++) . showsPsi psi)
-      Neg phi      -> parenthesise appPrec (("Neg " ++) . showsPrec' appPrec phi)
-      Eq s t       -> parenthesise eqPrec (showsPrec' eqPrec s . (" :=: " ++) . showsPrec' eqPrec t)
-      Forall x phi -> parenthesise appPrec (("Forall " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
-      Exists x phi -> parenthesise appPrec (("Exists " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
-      Elem s t     -> parenthesise elemPrec (showsPrec' elemPrec s . (" :€: " ++) . showsPrec' elemPrec t)
+        in parenthesise ctxPrec orPrec (showsPrec' orPrec phi . (" :\\/: " ++) . showsPsi psi)
+      Neg' phi      -> parenthesise ctxPrec appPrec (("Neg " ++) . showsPrec' appPrec phi)
+      Eq s t        -> parenthesise ctxPrec eqPrec (showsPrec' eqPrec s . (" :=: " ++) . showsPrec' eqPrec t)
+      Forall' x phi -> parenthesise ctxPrec appPrec (("Forall " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Exists' x phi -> parenthesise ctxPrec appPrec (("Exists " ++) . showsPrec' appPrec x . (" " ++) . showsPrec' appPrec phi)
+      Elem s t      -> parenthesise ctxPrec elemPrec (showsPrec' elemPrec s . (" :€: " ++) . showsPrec' elemPrec t)
+      Abbrev showsFn _ -> showsFn ctxPrec
     where
       showsPrec' p = showsPrec (p+1)
       eqPrec = 4
@@ -130,12 +145,31 @@ instance Show Formula where
       andPrec = 3
       orPrec = 2
       impliesPrec = 1
-      appPrec = 10
-      parenthesise opPrec showsFn =
-        if opPrec < ctxPrec then
-          ("(" ++) . showsFn . (")" ++)
-        else
-          showsFn
+
+-- | The precedence of (prefix) function application
+appPrec :: Int
+appPrec = 10
+
+-- | The precedence of infix function application
+infixAppPrec :: Int
+infixAppPrec = 9
+
+parenthesise
+  :: Int -- ^ the precedence of the surrounding context
+  -> Int -- ^ the precedence of the operator whose application may have to be put in parentheses
+  -> ShowS
+  -> ShowS
+parenthesise ctxPrec opPrec showsFn =
+  if opPrec < ctxPrec then
+    ("(" ++) . showsFn . (")" ++)
+  else
+    showsFn
+
+stripAbbrevs :: Formula -> Formula
+stripAbbrevs f =
+  case f of
+    Abbrev _ g -> stripAbbrevs g
+    _ -> f
 
 infix  4 :=:, :€:
 infixr 3 :/\:
@@ -143,19 +177,35 @@ infixr 2 :\/:
 infixr 1 :=>:
 
 pattern (:=>:) :: Formula -> Formula -> Formula
-pattern f :=>: g = Implies f g
+pattern f :=>: g <- (stripAbbrevs -> Implies f g) where
+  f :=>: g = Implies f g
 
 pattern (:\/:) :: Formula -> Formula -> Formula
 pattern f :\/: g = Or f g
 
 pattern (:/\:) :: Formula -> Formula -> Formula
-pattern f :/\: g = And f g
+pattern f :/\: g <- (stripAbbrevs -> And f g) where
+  f :/\: g = And f g
 
 pattern (:=:) :: Term -> Term -> Formula
-pattern f :=: g = Eq f g
+pattern s :=: t <- (stripAbbrevs -> Eq s t) where
+  s :=: t = Eq s t
 
 pattern (:€:) :: Term -> Term -> Formula
-pattern x :€: y  = Elem x y
+pattern x :€: y <- (stripAbbrevs -> Elem x y) where
+  x :€: y = Elem x y
+
+pattern Neg :: Formula -> Formula
+pattern Neg f <- (stripAbbrevs -> Neg' f) where
+  Neg f = Neg' f
+
+pattern Forall :: VarName -> Formula -> Formula
+pattern Forall x f <- (stripAbbrevs -> Forall' x f) where
+  Forall x f = Forall' x f
+
+pattern Exists :: VarName -> Formula -> Formula
+pattern Exists x f <- (stripAbbrevs -> Exists' x f) where
+  Exists x f = Exists' x f
 
 -- TODO: make pattern synonym?
 iff :: Formula -> Formula -> Formula
@@ -173,11 +223,12 @@ fvInFormula f =
     Implies g h -> fvInFormula g `varUnion` fvInFormula h
     And g h     -> fvInFormula g `varUnion` fvInFormula h
     Or g h      -> fvInFormula g `varUnion` fvInFormula h
-    Neg g       -> fvInFormula g
+    Neg' g      -> fvInFormula g
     Eq s t      -> fvInTerm s `varUnion` fvInTerm t
-    Forall x g  -> filter (/= x) (fvInFormula g)
-    Exists x g  -> filter (/= x) (fvInFormula g)
+    Forall' x g -> filter (/= x) (fvInFormula g)
+    Exists' x g -> filter (/= x) (fvInFormula g)
     Elem s t    -> fvInTerm s `varUnion` fvInTerm t
+    Abbrev _ g  -> fvInFormula g
 
 varsInFormula :: Formula -> [VarName]
 varsInFormula f =
@@ -185,11 +236,12 @@ varsInFormula f =
     Implies g h -> varsInFormula g `varUnion` varsInFormula h
     And g h     -> varsInFormula g `varUnion` varsInFormula h
     Or g h      -> varsInFormula g `varUnion` varsInFormula h
-    Neg g       -> varsInFormula g
+    Neg' g      -> varsInFormula g
     Eq s t      -> varsInTerm s `varUnion` varsInTerm t
-    Forall x g  -> [x] `varUnion` varsInFormula g
-    Exists x g  -> [x] `varUnion` varsInFormula g
+    Forall' x g -> [x] `varUnion` varsInFormula g
+    Exists' x g -> [x] `varUnion` varsInFormula g
     Elem s t    -> varsInTerm s `varUnion` varsInTerm t
+    Abbrev _ g  -> varsInFormula g
 
 replaceInFormulaWithCaptureAndShadowingCheck :: VarName -> Term -> [VarName] -> VarName -> Formula -> Formula
 replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g =
@@ -209,11 +261,16 @@ replaceInFormula' x s fvInS f =
     Implies g h -> Implies (recurseFormula g) (recurseFormula h)
     And g h -> And (recurseFormula g) (recurseFormula h)
     Or g h -> Or (recurseFormula g) (recurseFormula h)
-    Neg g -> Neg (recurseFormula g)
+    Neg' g -> Neg' (recurseFormula g)
     Eq r t -> Eq (recurseTerm r) (recurseTerm t)
-    Forall y g -> Forall y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
-    Exists y g -> Exists y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
+    Forall' y g -> Forall' y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
+    Exists' y g -> Exists' y (replaceInFormulaWithCaptureAndShadowingCheck x s fvInS y g)
     Elem r t -> Elem (recurseTerm r) (recurseTerm t)
+    Abbrev _ g ->
+      if x `elem` fvInFormula g then
+        recurseFormula g
+      else
+        f
   where
     recurseFormula = replaceInFormula' x s fvInS
     recurseTerm = replaceInTerm' x s fvInS
@@ -245,22 +302,35 @@ falsity = Neg truth
 
 subset :: Term -> Term -> Formula
 subset s t =
-  let x = freshVar (fvInTerm s `varUnion` fvInTerm t)
-  in Forall x (Var x :€: s :=>: Var x :€: t)
+  let
+    x = freshVar (fvInTerm s `varUnion` fvInTerm t)
+  in
+    Abbrev
+      (\p -> parenthesise p infixAppPrec (showsPrec (infixAppPrec+1) s . (" `subset` " ++) . showsPrec (infixAppPrec+1) t))
+      (Forall x (Var x :€: s :=>: Var x :€: t))
 
 superset :: Term -> Term -> Formula
 superset s t = subset t s
 
 -- TODO: make pattern?
 forallIn :: VarName -> Term -> Formula -> Formula
-forallIn x y phi = Forall x (Var x :€: y :=>: phi)
+forallIn x y phi =
+  Abbrev
+    (\p -> parenthesise p appPrec (("forallIn " ++) . showsPrec (appPrec+1) x . (" " ++) . showsPrec (appPrec+1) y . (" " ++) . showsPrec (appPrec+1) phi))
+    (Forall x (Var x :€: y :=>: phi))
 
 -- TODO: make pattern?
 existsIn :: VarName -> Term -> Formula -> Formula
-existsIn x y phi = Exists x (Var x :€: y :/\: phi)
+existsIn x y phi =
+  Abbrev
+    (\p -> parenthesise p appPrec (("existsIn " ++) . showsPrec (appPrec+1) x . (" " ++) . showsPrec (appPrec+1) y . (" " ++) . showsPrec (appPrec+1) phi))
+    (Exists x (Var x :€: y :/\: phi))
 
 existsUniqueIn :: VarName -> Term -> Formula -> Formula
-existsUniqueIn x y phi = existsUnique x ((Var x :€: y) :/\: phi)
+existsUniqueIn x y phi =
+  Abbrev
+    (\p -> parenthesise p appPrec (("existsUniqueIn " ++) . showsPrec (appPrec+1) x . (" " ++) . showsPrec (appPrec+1) y . (" " ++) . showsPrec (appPrec+1) phi))
+    (existsUnique x ((Var x :€: y) :/\: phi))
 
 emptySet :: Term
 emptySet = DefDescr name (Forall x (Neg (Var x :€: Var name)))

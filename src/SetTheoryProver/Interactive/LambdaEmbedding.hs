@@ -107,7 +107,7 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
             (arg', argType) = go env arg
           in
             case funType of
-              Implies phi psi ->
+              phi :=>: psi ->
                 if phi == argType
                   then (LCApp fun' arg', psi)
                   else error "translate: argument types don't match!"
@@ -122,7 +122,7 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
               in
                 case funType of
                   phi' :=>: (psi :=>: xi) | phi == phi' ->
-                    ((LCPrf (ax3 phi psi xi) `LCApp` fun') `LCApp` arg', phi `Implies` xi)
+                    ((LCPrf (ax3 phi psi xi) `LCApp` fun') `LCApp` arg', phi :=>: xi)
                   _ -> error "translate: expected a function type with two arguments, the first of which is phi!"
             LCAbs _ _ | x `elem` freeVariables body ->
               let
@@ -147,7 +147,7 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
               let
                 (body', bodyType) = go env body
               in
-                (LCPrf (ax2 bodyType phi) `LCApp` body', phi `Implies` bodyType)
+                (LCPrf (ax2 bodyType phi) `LCApp` body', phi :=>: bodyType)
         LCPrf p -> (LCPrf p, getFormula p)
         LCForall x body ->
           let

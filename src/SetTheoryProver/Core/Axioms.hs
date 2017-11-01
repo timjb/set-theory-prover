@@ -76,7 +76,10 @@ mp p q =
   case getFormula p of
     precedent :=>: consequent ->
       if precedent /= getFormula q then
-        error "mp: The second argument of 'mp' must be equal to the precedent of the first argument!"
+        error
+          ("mp: The second argument '" ++ show (getFormula q) ++
+           "' of 'mp' must be equal to the precedent '" ++ show precedent ++
+           "' of the first argument!")
       else
         Proof { getFormula = consequent, reason = ModusPonens p q }
     _ -> error "mp: The first argument to 'mp' must be the proof of an implication!"
@@ -134,7 +137,7 @@ ax7 x phi =
 
 -- | Axiom schema 't = t' (reflexivity)
 ax8 :: Term -> Proof
-ax8 t = axiom (Eq t t)
+ax8 t = axiom (t :=: t)
 
 -- | Axiom schema 's = t ⇒ φ[x := s] ⇒ φ[x := t]' (transport)
 ax9 :: Term -> Term -> VarName -> Formula -> Proof
@@ -195,8 +198,8 @@ extensionalityAxiom = axiom (Forall x (Forall y (subset (Var x) (Var y) :=>: sub
 regularityAxiom :: Proof
 regularityAxiom = axiom (Forall x (antecedent :=>: consequent))
   where
-    antecedent = Exists y (Elem (Var y) (Var x))
-    consequent = existsIn y (Var x) (Neg (existsIn z (Var y) (Elem (Var z) (Var x))))
+    antecedent = Exists y (Var y :€: Var x)
+    consequent = existsIn y (Var x) (Neg (existsIn z (Var y) (Var z :€: Var x)))
     x = "x"
     y = "y"
     z = "z"
