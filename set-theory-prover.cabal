@@ -26,6 +26,7 @@ library
     SetTheoryProver.Interactive.TacticMonad
     SetTheoryProver.Interactive.Tactics
     SetTheoryProver.Lib.Logic
+    SetTheoryProver.Lib.SetTheory
   build-depends:
     base >= 4.7 && < 5,
     mtl,
