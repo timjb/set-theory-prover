@@ -33,6 +33,7 @@ module SetTheoryProver.Interactive.Tactics
   , exists
   , elimExists
   , weShow
+  , desugar
   ) where
 
 import Prelude hiding (repeat)
@@ -578,6 +579,19 @@ elimExists y asmName = do
             (key,val):otherPairs
           else
             (key1,val1) : set key val otherPairs
+
+-- | Strip outermost abbreviation in the current goal. Doesn't fail.
+desugar :: Tactic
+desugar = do
+  state <- get
+  case currentGoals state of
+    [] -> pure ()
+    subgoal : subgoals -> do
+      let subgoal' = subgoal { claim = stripAbbrev (claim subgoal) }
+      put $
+        state
+        { currentGoals = subgoal' : subgoals
+        }
 
 -- TODO: rewrite tactic
 -- TODO: auto tactic

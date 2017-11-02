@@ -8,6 +8,7 @@ module SetTheoryProver.Core.Syntax
   , Ctx
   , Term (..)
   , Formula ((:=>:), (:<=>:), (:\/:), (:/\:), (:=:), (:€:), Neg, Forall, Exists)
+  , stripAbbrev
   -- * Variable management
   , varUnion
   , freshVar
@@ -163,6 +164,12 @@ parenthesise ctxPrec opPrec showsFn =
   else
     showsFn
 
+stripAbbrev :: Formula -> Formula
+stripAbbrev f =
+  case f of
+    Abbrev _ g -> g
+    _ -> f
+
 stripAbbrevs :: Formula -> Formula
 stripAbbrevs f =
   case f of
@@ -215,9 +222,11 @@ pattern phi :<=>: psi <- (stripAbbrevs -> (And (phi :=>: psi) (((Implies psi phi
     where
       iffPrec = 1
 
-
 existsUnique :: VarName -> Formula -> Formula
-existsUnique x phi = Exists x (phi :/\: uniquenessOfX)
+existsUnique x phi =
+  Abbrev
+    (\p -> parenthesise p appPrec (("existsUnique " ++) . showsPrec (appPrec+1) x . (" " ++) . showsPrec (appPrec+1) phi))
+    (Exists x (phi :/\: uniquenessOfX))
   where
     y = freshVar (fvInFormula phi)
     uniquenessOfX = Forall y (replaceInFormula x (Var y) phi :=>: (Var x :=: Var y))
