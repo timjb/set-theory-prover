@@ -7,7 +7,7 @@ module SetTheoryProver.Core.Syntax
   ( VarName
   , Ctx
   , Term (..)
-  , Formula ((:=>:), (:\/:), (:/\:), (:=:), (:€:), Neg, Forall, Exists)
+  , Formula ((:=>:), (:<=>:), (:\/:), (:/\:), (:=:), (:€:), Neg, Forall, Exists)
   -- * Variable management
   , varUnion
   , freshVar
@@ -19,8 +19,6 @@ module SetTheoryProver.Core.Syntax
   , fvInFormula
   , varsInFormula
   , replaceInFormula
-  -- * Derived logical connectives
-  , iff
   -- * Derived predicates
   , truth
   , falsity
@@ -175,6 +173,7 @@ infix  4 :=:, :€:
 infixr 3 :/\:
 infixr 2 :\/:
 infixr 1 :=>:
+infix  1 :<=>:
 
 pattern (:=>:) :: Formula -> Formula -> Formula
 pattern f :=>: g <- (stripAbbrevs -> Implies f g) where
@@ -207,9 +206,15 @@ pattern Exists :: VarName -> Formula -> Formula
 pattern Exists x f <- (stripAbbrevs -> Exists' x f) where
   Exists x f = Exists' x f
 
--- TODO: make pattern synonym?
-iff :: Formula -> Formula -> Formula
-iff phi psi = (phi :=>: psi) :/\: (psi :=>: phi)
+pattern (:<=>:) :: Formula -> Formula -> Formula
+pattern phi :<=>: psi <- (stripAbbrevs -> (And (phi :=>: psi) (((Implies psi phi) ==) -> True))) where
+  phi :<=>: psi =
+    Abbrev
+      (\p -> parenthesise p iffPrec (showsPrec (iffPrec+1) phi . (" :<=>: " ++) . showsPrec (iffPrec+1) psi))
+      ((phi :=>: psi) :/\: (psi :=>: phi))
+    where
+      iffPrec = 1
+
 
 existsUnique :: VarName -> Formula -> Formula
 existsUnique x phi = Exists x (phi :/\: uniquenessOfX)
@@ -341,22 +346,22 @@ emptySet = DefDescr name (Forall x (Neg (Var x :€: Var name)))
 pairSet :: Term -> Term -> Term
 pairSet s t =
   let x:y:_ = freshVars (fvInTerm s `varUnion` fvInTerm t)
-  in DefDescr x (Forall y ((Var y :€: Var x) `iff` (Var y :=: s :\/: Var y :=: t)))
+  in DefDescr x (Forall y (Var y :€: Var x :<=>: Var y :=: s :\/: Var y :=: t))
 
 singletonSet :: Term -> Term
 singletonSet t =
   let x:y:_ = freshVars (fvInTerm t)
-  in DefDescr x (Forall y ((Var y :€: Var x) `iff` (Var y :=: t)))
+  in DefDescr x (Forall y (Var y :€: Var x :<=>: Var y :=: t))
 
 -- | '{ x ∈ y | phi }'
 comprehension :: VarName -> Term -> Formula -> Term
-comprehension x y phi = DefDescr u (Forall x ((Var x :€: Var u) `iff` (Var x :€: y :/\: phi)))
+comprehension x y phi = DefDescr u (Forall x (Var x :€: Var u :<=>: Var x :€: y :/\: phi))
   where
     u = freshVar ([x] `varUnion` (fvInTerm y `varUnion` fvInFormula phi))
 
 logicalToSetOperator :: (Formula -> Formula -> Formula) -> Term -> Term -> Term
 logicalToSetOperator op x y =
-  DefDescr u (Forall v ((Var v :€: Var u) `iff` ((Var v :€: x) `op` (Var v :€: y))))
+  DefDescr u (Forall v (Var v :€: Var u :<=>: ((Var v :€: x) `op` (Var v :€: y))))
   where
     u:v:_ = freshVars (fvInTerm x `varUnion` fvInTerm y)
 

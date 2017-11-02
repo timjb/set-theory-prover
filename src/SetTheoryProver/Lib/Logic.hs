@@ -141,7 +141,7 @@ uncurry phi psi xi =
 
 currying :: Formula -> Formula -> Formula -> Proof
 currying phi psi xi =
-  prove ((phi :/\: psi :=>: xi) `iff` (phi :=>: psi :=>: xi)) $ do
+  prove ((phi :/\: psi :=>: xi) :<=>: (phi :=>: psi :=>: xi)) $ do
     split
     exact (curry phi psi xi)
     exact (uncurry phi psi xi)
@@ -162,7 +162,7 @@ orCommutative phi psi =
 -- >>> checkProof (orAssociative phi psi xi)
 orAssociative :: Formula -> Formula -> Formula -> Proof
 orAssociative phi psi xi =
-  prove ((phi :\/: (psi :\/: xi)) `iff` ((phi :\/: psi) :\/: xi)) $ do
+  prove (phi :\/: (psi :\/: xi) :<=>: (phi :\/: psi) :\/: xi) $ do
     split
     -- =>
     intro "phiOrPsiOrXi"
@@ -184,7 +184,7 @@ orAssociative phi psi xi =
 -- >>> checkProof (orFalsity phi)
 orFalsity :: Formula -> Proof
 orFalsity phi =
-  prove ((phi :\/: falsity) `iff` phi) $ do
+  prove (phi :\/: falsity :<=>: phi) $ do
     split
     -- =>
     intro "phiOrFalsity"
@@ -213,7 +213,7 @@ andCommutative phi psi =
 -- >>> checkProof (andAssociative phi psi xi)
 andAssociative :: Formula -> Formula -> Formula -> Proof
 andAssociative phi psi xi =
-  prove ((phi :/\: (psi :/\: xi)) `iff` ((phi :/\: psi) :/\: xi)) $ do
+  prove (phi :/\: (psi :/\: xi) :<=>: (phi :/\: psi) :/\: xi) $ do
     split
     -- =>
     intro "h"
@@ -235,7 +235,7 @@ andAssociative phi psi xi =
 -- >>> checkProof (andTruth phi)
 andTruth :: Formula -> Proof
 andTruth phi =
-  prove ((phi :/\: truth) `iff` phi) $ do
+  prove (phi :/\: truth :<=>: phi) $ do
     split
     -- =>
     intro "phiAndTruth"
@@ -252,7 +252,7 @@ andTruth phi =
 -- >>> checkProof (andDistributesOverOr phi psi xi)
 andDistributesOverOr :: Formula -> Formula -> Formula -> Proof
 andDistributesOverOr phi psi xi =
-  prove ((phi :/\: (psi :\/: xi)) `iff` ((phi :/\: psi) :\/: (phi :/\: xi))) $ do
+  prove (phi :/\: (psi :\/: xi) :<=>: (phi :/\: psi) :\/: (phi :/\: xi)) $ do
     split
     -- =>
     intro "phiAndPsiOrXi"
@@ -281,7 +281,7 @@ andDistributesOverOr phi psi xi =
 -- >>> checkProof (orDistributesOverAnd phi psi xi)
 orDistributesOverAnd :: Formula -> Formula -> Formula -> Proof
 orDistributesOverAnd phi psi xi =
-  prove ((phi :\/: (psi :/\: xi)) `iff` ((phi :\/: psi) :/\: (phi :\/: xi))) $ do
+  prove (phi :\/: (psi :/\: xi) :<=>: (phi :\/: psi) :/\: (phi :\/: xi)) $ do
     split
     -- =>
     weShow (phi :\/: (psi :/\: xi) :=>: (phi :\/: psi) :/\: (phi :\/: xi)) by $ do
@@ -365,7 +365,7 @@ negCharacterisation' phi =
 -- >>> checkProof (negCharacterisation phi)
 negCharacterisation :: Formula -> Proof
 negCharacterisation phi =
-  prove (Neg phi `iff` (phi :=>: falsity)) $ do
+  prove (Neg phi :<=>: (phi :=>: falsity)) $ do
     split
     -- =>
     exact (contradiction phi)
@@ -466,7 +466,7 @@ deMorgan1b phi psi =
 -- >>> checkProof (deMorgan1 phi psi)
 deMorgan1 :: Formula -> Formula -> Proof
 deMorgan1 phi psi =
-  prove (Neg (phi :/\: psi) `iff` (Neg phi :\/: Neg psi)) $ do
+  prove (Neg (phi :/\: psi) :<=>: (Neg phi :\/: Neg psi)) $ do
     split
     exact (deMorgan1a phi psi)
     exact (deMorgan1b phi psi)
@@ -506,7 +506,7 @@ deMorgan2b phi psi =
 -- >>> checkProof (deMorgan2 phi psi)
 deMorgan2 :: Formula -> Formula -> Proof
 deMorgan2 phi psi =
-  prove (Neg (phi :\/: psi) `iff` (Neg phi :/\: Neg psi)) $ do
+  prove (Neg (phi :\/: psi) :<=>: Neg phi :/\: Neg psi) $ do
     split
     exact (deMorgan2a phi psi)
     exact (deMorgan2b phi psi)
@@ -541,7 +541,7 @@ implicationOr2 phi psi =
 -- >>> checkProof (implicationOr phi psi)
 implicationOr :: Formula -> Formula -> Proof
 implicationOr phi psi =
-  prove ((phi :=>: psi) `iff` (Neg phi :\/: psi)) $ do
+  prove ((phi :=>: psi) :<=>: Neg phi :\/: psi) $ do
     split
     exact (implicationOr1 phi psi)
     exact (implicationOr2 phi psi)
@@ -624,7 +624,7 @@ negForall2 x phi =
 -- >>> checkProof (negForall "x" phi)
 negForall :: VarName -> Formula -> Proof
 negForall x phi =
-  prove (Neg (Forall x phi) `iff` Exists x (Neg phi)) $ do
+  prove (Neg (Forall x phi) :<=>: Exists x (Neg phi)) $ do
     split
     exact (negForall1 x phi)
     exact (negForall2 x phi)
@@ -659,7 +659,7 @@ negExists2 x phi =
 -- >>> checkProof (negExists "x" phi)
 negExists :: VarName -> Formula -> Proof
 negExists x phi =
-  prove (Neg (Exists x phi) `iff` Forall x (Neg phi)) $ do
+  prove (Neg (Exists x phi) :<=>: Forall x (Neg phi)) $ do
     split
     exact (negExists1 x phi)
     exact (negExists2 x phi)

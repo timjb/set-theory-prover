@@ -208,7 +208,7 @@ regularityAxiom = axiom (Forall x (antecedent :=>: consequent))
 separationAxiom :: VarName -> VarName -> Formula -> Proof
 separationAxiom x z phi =
   let y = freshVar (fvInFormula phi `varUnion` [x,z])
-  in axiom (Forall z (Exists y (Forall x ((Var x :€: Var y) `iff` ((Var x :€: Var z) :/\: phi)))))
+  in axiom (Forall z (Exists y (Forall x (Var x :€: Var y :<=>: (Var x :€: Var z) :/\: phi))))
 
 pairingAxiom :: Proof
 pairingAxiom = axiom (Forall x (Forall y (Exists z ((Var x :€: Var z) :/\: (Var y :€: Var z)))))
@@ -243,7 +243,7 @@ infinityAxiom = axiom (Exists x ((emptySet :€: Var x) :/\: forallIn y (Var x) 
     y = "y"
 
 powersetAxiom :: Proof
-powersetAxiom = axiom (Forall x (Exists y (Forall z ((Var z :€: Var y) `iff` (Var z `subset` Var x)))))
+powersetAxiom = axiom (Forall x (Exists y (Forall z (Var z :€: Var y :<=>: Var z `subset` Var x))))
   where
     x = "x"
     y = "y"
