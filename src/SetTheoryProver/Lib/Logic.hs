@@ -65,8 +65,6 @@ import Prelude hiding (repeat, curry, uncurry)
 import SetTheoryProver.Core
 import SetTheoryProver.Interactive
 
-import Control.Monad (when)
-
 -- $setup
 -- >>> let phi = Var "x" :€: Var "s"
 -- >>> let psi = Var "y" :€: Var "s"
@@ -310,12 +308,12 @@ orDistributesOverAnd phi psi xi =
       assumption "psi"
       assumption "xi"
 
--- | Schema '¬φ ⇒ φ ⇒ ⊥'
+-- | Schema '¬φ ⇒ φ ⇒ ψ'
 --
--- >>> checkProof (contradiction phi)
-contradiction :: Formula -> Proof
-contradiction phi =
-  prove (Neg phi :=>: phi :=>: falsity) $ do
+-- >>> checkProof (contradiction phi psi)
+contradiction :: Formula -> Formula -> Proof
+contradiction phi psi =
+  prove (Neg phi :=>: phi :=>: psi) $ do
     intro "notPhi"
     contraposition
     intro "_"
@@ -332,7 +330,7 @@ negNegElimination phi =
       apply "truthImpliesPhi"
       exact truthIsTrue
     contraposition
-    applyProof (contradiction (Neg phi))
+    applyProof (contradiction (Neg phi) falsity)
     assumption "negNegPhi"
 
 -- | Schema 'φ ⇒ ¬¬φ'
@@ -368,7 +366,7 @@ negCharacterisation phi =
   prove (Neg phi :<=>: (phi :=>: falsity)) $ do
     split
     -- =>
-    exact (contradiction phi)
+    exact (contradiction phi falsity)
     -- <=
     exact (negCharacterisation' phi)
 
@@ -428,9 +426,7 @@ haveContradiction lambdaTerm1 lambdaTerm2 = do
           ("haveContradiction: expected one of the formulas '" ++ show phi ++ "' and '" ++ show phi'
            ++ "' to be the negation of the other.")
   subgoal <- getSubgoal
-  when (claim subgoal /= falsity) $
-    applyProof (exFalso (claim subgoal))
-  exact (LCPrf (contradiction phi) :@ negatedTerm :@ positiveTerm)
+  exact (LCPrf (contradiction phi (claim subgoal)) :@ negatedTerm :@ positiveTerm)
 
 -- | Schema '¬(φ ∧ ψ) ⇒ ¬φ ∨ ¬ψ'
 --
