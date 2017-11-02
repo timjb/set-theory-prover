@@ -30,7 +30,6 @@ module SetTheoryProver.Interactive.Tactics
   , focus
   , generalising
   , transport
-  , instantiate
   , exists
   , elimExists
   , weShow
@@ -473,7 +472,7 @@ generalising = do
     , constructProof =
         \case
           [] -> error "generalising: expected to get at least one proof!"
-          phiProof:otherProofs -> constructProof state (LCForall x phiProof : otherProofs)
+          phiProof:otherProofs -> constructProof state (LCTermAbs x phiProof : otherProofs)
     }
 
 transport :: LC -> (Term -> Formula) -> Tactic
@@ -502,14 +501,6 @@ transport term instantiateFormula = do
             in constructProof state (p':ps)
     }
 
-instantiate :: LC -> Term -> TacticM LC
-instantiate lambdaProof term = do
-  asms <- getAssumptions
-  case inferType asms lambdaProof of
-    Left err -> fail ("instantiate: failed to infer type of lambda term (error: '" ++ err ++ "')")
-    Right (Forall x phi) -> pure (LCPrf (ax5 x term phi) :@ lambdaProof)
-    Right _ -> fail "instantiate: expected type of lambda term to be of the form 'Forall x phi'"
-
 exists :: Term -> Tactic
 exists term = do
   state <- get
@@ -528,7 +519,7 @@ exists term = do
         \case
           [] -> error "exists: expected to get at least one proof"
           p:ps ->
-            let p' = LCPrf (ax5 z term (phiTemplate :=>: Exists x phi)) :@ LCForall z (LCPrf (existsIntro z x phiTemplate)) :@ p
+            let p' = LCPrf (ax5 z term (phiTemplate :=>: Exists x phi)) :@ LCTermAbs z (LCPrf (existsIntro z x phiTemplate)) :@ p
             in constructProof state (p':ps)
     }
 
@@ -539,7 +530,7 @@ renameExistentialQuantifier x phi y phi' lambdaTerm =
     lambdaTerm
   else
     LCPrf (existsElim x phi (Exists y phi'))
-      :@ LCForall x (LCPrf (existsIntro x y phi))
+      :@ LCTermAbs x (LCPrf (existsIntro x y phi))
       :@ lambdaTerm
 
 elimExists :: VarName -> String -> Tactic
@@ -572,7 +563,7 @@ elimExists y asmName = do
             let
               p' =
                 LCPrf (existsElim y phi' target)
-                  :@ LCForall y (LCAbs (asmName, phi') p)
+                  :@ LCTermAbs y (LCAbs (asmName, phi') p)
                   :@ renameExistentialQuantifier x phi y phi' (LCVar asmName)
             in
               constructProof state (p':ps)

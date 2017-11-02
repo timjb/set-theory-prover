@@ -590,7 +590,7 @@ forallImpliesExists x phi =
   prove (Forall x phi :=>: Exists x phi) $ do
     intro "h"
     exists "a"
-    instantiate "h" "a" >>= exact
+    exact ("h" :@@ "a")
 
 -- | Schema '¬(∀x. φ) ⇒ ∃x. ¬φ'
 --
@@ -617,8 +617,7 @@ negForall2 x phi =
     intro "existsXWithNegPhi"
     negIntro "forallXPhi"
     elimExists "y" "existsXWithNegPhi" -- TODO: make sure y appears nowhere else
-    phiHoldsForY <- instantiate "forallXPhi" (Var "y")
-    haveContradiction "existsXWithNegPhi" phiHoldsForY
+    haveContradiction "existsXWithNegPhi" ("forallXPhi" :@@ Var "y")
 
 -- | Schema '¬(∀x. φ) ⇔ ∃x. ¬φ'
 --
@@ -653,8 +652,7 @@ negExists2 x phi =
     intro "forallXNegPhi"
     negIntro "existsXPhi"
     elimExists x "existsXPhi"
-    negPhi <- instantiate "forallXNegPhi" (Var x)
-    haveContradiction negPhi "existsXPhi"
+    haveContradiction ("forallXNegPhi" :@@ Var x) "existsXPhi"
 
 -- | Schema '¬(∃x. φ) ⇔ ∀x. ¬φ'
 --

@@ -35,8 +35,8 @@ subsetTransitivity s t u =
     intros ["s_subset_t", "t_subset_u"]
     generalising
     intro "elem_s"
-    instantiate "t_subset_u" "x1" >>= apply
-    instantiate "s_subset_t" "x1" >>= apply
+    apply ("t_subset_u" :@@ "x1")
+    apply ("s_subset_t" :@@ "x1")
     assumption "elem_s"
 
 -- | The "is subset of" relation is anti-symmetric
@@ -44,10 +44,8 @@ subsetTransitivity s t u =
 -- >>> checkProof (subsetAntisymmetry s t)
 subsetAntisymmetry :: Term -> Term -> Proof
 subsetAntisymmetry s t =
-  prove ((s `subset` t) :=>: (t `subset` s) :=>: s :=: t) $ do
-    ext1 <- instantiate (LCPrf extensionalityAxiom) s
-    ext2 <- instantiate ext1 t
-    exact ext2
+  prove ((s `subset` t) :=>: (t `subset` s) :=>: s :=: t) $
+    exact (LCPrf extensionalityAxiom :@@ s :@@ t)
 
 -- TODO:
 -- * x `cap` y subset x

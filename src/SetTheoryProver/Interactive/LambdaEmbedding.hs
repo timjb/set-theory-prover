@@ -3,7 +3,7 @@
 module SetTheoryProver.Interactive.LambdaEmbedding
   (
   -- * Translating lambda terms to proofs
-    LC(.., (:->), (:@))
+    LC(.., (:->), (:@), (:@@))
   , pattern (:::)
   , ToLC(..)
   , inferType
@@ -21,10 +21,11 @@ data LC
   | LCApp LC LC                 -- ^ application
   | LCVar VarName               -- ^ variable
   | LCPrf Proof                 -- ^ proof
-  | LCForall VarName LC         -- ^ all-quantification
+  | LCTermAbs VarName LC        -- ^ all-quantification
+  | LCTermApp LC Term           -- ^ instantiation of an all-quantified formula
 
 infix 8 :::
-infixl 4 :@
+infixl 4 :@, :@@
 infixr 1 :->
 
 instance IsString LC where
@@ -48,14 +49,18 @@ pattern arg :-> t = LCAbs arg t
 pattern (:@) :: LC -> LC -> LC
 pattern s :@ t = LCApp s t
 
+pattern (:@@) :: LC -> Term -> LC
+pattern s :@@ t = LCTermApp s t
+
 freeVariables :: LC -> [VarName]
 freeVariables t =
   case t of
-    LCAbs arg s  -> filter (/= fst arg) (freeVariables s)
-    LCApp u v    -> freeVariables u `varUnion` freeVariables v
-    LCVar x      -> [x]
-    LCPrf _      -> []
-    LCForall _ s -> freeVariables s
+    LCAbs arg s   -> filter (/= fst arg) (freeVariables s)
+    LCApp u v     -> freeVariables u `varUnion` freeVariables v
+    LCVar x       -> [x]
+    LCPrf _       -> []
+    LCTermAbs _ s -> freeVariables s
+    LCTermApp s _ -> freeVariables s
 
 inferType :: [(VarName, Formula)] -> LC -> Either String Formula
 inferType env t =
@@ -77,7 +82,7 @@ inferType env t =
         Just formula -> Right formula
     LCPrf p ->
       Right (getFormula p)
-    LCForall x body ->
+    LCTermAbs x body ->
       let
         typeOfVariableContainsX v =
           case lookup v env of
@@ -90,6 +95,11 @@ inferType env t =
               ("forbidden usage of lambda variable '" ++ v ++ "' (whose formula contains '" ++ x ++ "') " ++
                "in term proving all-quantified (over '" ++ x ++ "') subformula")
           [] -> Forall x <$> inferType env body
+    LCTermApp s term -> do
+      sType <- inferType env s
+      case sType of
+        Forall x phi -> Right (replaceInFormula x term phi)
+        _ -> Left "expected first argument of LCTermApp to have type of the form 'Forall x phi'"
 
 translate :: LC -> Proof
 translate lambdaTerm = extract (fst (go [] lambdaTerm))
@@ -130,35 +140,51 @@ translate lambdaTerm = extract (fst (go [] lambdaTerm))
                 (body', _) = go env' body
               in
                 go env (LCAbs (x, phi) body')
-            LCForall y forallBody | x `elem` freeVariables body ->
+            LCTermAbs y forallBody | x `elem` freeVariables body ->
               if y `elem` fvInFormula phi then
                 error
                   ("translate: forbidden usage of lambda variable '" ++ x ++ "' (whose formula contains '" ++ y ++ "') " ++
                    "in term proving all-quantified (over '" ++ y ++ "') subformula")
               else
                 let
-                  (forallBody', forallBodyType) = go env (LCAbs (x, phi) forallBody)
+                  env' = (x,phi):env
+                  (forallBody', forallBodyType) = go env' (LCAbs (x, phi) forallBody)
                 in
                   case forallBodyType of
                     phi' :=>: psi | phi == phi' ->
-                      go env (LCAbs (x, phi) ((LCPrf (ax6 y phi psi) `LCApp` (LCForall y forallBody')) `LCApp` (LCPrf (ax7 y phi) `LCApp` LCVar x)))
+                      go env (LCAbs (x, phi) ((LCPrf (ax6 y phi psi) `LCApp` (LCTermAbs y forallBody')) `LCApp` (LCPrf (ax7 y phi) `LCApp` LCVar x)))
                     _ -> error "translate: expected a function type with two arguments, the first of which is phi!"
+            LCTermApp s _ | x `elem` freeVariables s ->
+              let
+                env' = (x,phi):env
+                (body', _) = go env' body
+              in
+                go env (LCAbs (x,phi) body')
             _ -> -- x is not free in body
               let
                 (body', bodyType) = go env body
               in
                 (LCPrf (ax2 bodyType phi) `LCApp` body', phi :=>: bodyType)
         LCPrf p -> (LCPrf p, getFormula p)
-        LCForall x body ->
+        LCTermAbs x body ->
           let
             (body', bodyType) = go env body
           in
-            (LCForall x body', Forall x bodyType)
+            (LCTermAbs x body', Forall x bodyType)
+        LCTermApp s t ->
+          let
+            (s', sType) = go env s
+          in
+            case sType of
+              Forall x phi ->
+                (LCPrf (ax5 x t phi) :@ s', replaceInFormula x t phi)
+              _ -> error "translate: expected an all-quantified formula"
     extract :: LC -> Proof
     extract term =
       case term of
         LCPrf p -> p
         LCApp fun arg -> extract fun `mp` extract arg
-        LCForall x body -> generalise x (extract body)
+        LCTermAbs x body -> generalise x (extract body)
         LCAbs _ _ -> error "translate: didn't expect function in extract"
         LCVar _ -> error "translate: didn't expect variable in extract"
+        LCTermApp _ _ -> error "translate: didn't expect term application"
